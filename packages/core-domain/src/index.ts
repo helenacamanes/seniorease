@@ -8,3 +8,5 @@ export interface Task {
 export const getGuidedSteps = (taskTitle: string): string[] => {
   return ["Passo 1: Ler com calma", `Passo 2: Iniciar a tarefa: ${taskTitle}`, "Passo 3: Confirmar conclusão"];
 };
+
+export * from './use-cases/AuthValidator';
