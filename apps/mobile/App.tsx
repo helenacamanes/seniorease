@@ -4,8 +4,8 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './src/lib/firebase';
 
 // 🌟 Importações limpas das telas separadas
-import LoginScreen from './src/screens/LoginScreen';
-import DashboardScreen from './src/screens/DashboardScreen';
+import {LoginScreen} from './src/screens/LoginScreen';
+import {DashboardScreen} from './src/screens/DashboardScreen';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
@@ -28,6 +28,5 @@ export default function App() {
     );
   }
 
-  // Chave do fluxo limpa de ciclos
   return user ? <DashboardScreen /> : <LoginScreen />;
 }
