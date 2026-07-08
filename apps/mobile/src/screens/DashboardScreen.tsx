@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 
-export default function DashboardScreen() {
+export function DashboardScreen() {
   const user = auth.currentUser;
 
   const handleLogout = async () => {
