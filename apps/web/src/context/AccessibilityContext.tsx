@@ -1,0 +1,1 @@
+import { AccessibilityPreferences } from '@seniorease/domain' 

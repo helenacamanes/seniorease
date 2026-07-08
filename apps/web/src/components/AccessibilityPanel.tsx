@@ -1,14 +1,12 @@
 'use client';
 
-import React from 'react';
-
-// Interface com todas as preferências exigidas pelo Hackathon
 export interface AccessibilityPreferences {
   fontSize: 'normal' | 'large' | 'extra-large';
   highContrast: boolean;
   spacing: 'normal' | 'wide';
   simplifiedMode: boolean;
   extraConfirmation: boolean;
+  reminderFrequency: 'none' | 'daily' | 'weekly';
 }
 
 interface AccessibilityPanelProps {
@@ -17,113 +15,79 @@ interface AccessibilityPanelProps {
 }
 
 export function AccessibilityPanel({ prefs, onChange }: AccessibilityPanelProps) {
-  
-  const updatePref = (key: keyof AccessibilityPreferences, value: any) => {
-    onChange({ ...prefs, [key]: value });
+  const getFontSizeClass = () => {
+    if (prefs.fontSize === 'large') return 'text-lg';
+    if (prefs.fontSize === 'extra-large') return 'text-xl';
+    return 'text-base';
   };
 
-  // Cores dinâmicas para Alto Contraste
-  const panelBg = prefs.highContrast ? 'bg-zinc-950 border-yellow-400 text-yellow-400' : 'bg-white border-slate-200 text-slate-800';
-  const btnActive = prefs.highContrast ? 'bg-yellow-400 text-black font-bold border-yellow-400' : 'bg-blue-600 text-white font-semibold border-blue-600';
-  const btnInactive = prefs.highContrast ? 'border-2 border-yellow-400 text-yellow-400 hover:bg-zinc-900' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200';
-  const labelSize = prefs.fontSize === 'normal' ? 'text-lg' : 'text-xl font-bold';
+  // Resposta visual padrão para cliques no painel: escala menor imediata e bordas nítidas
+  const buttonBaseStyle = `px-5 py-3 font-bold rounded-xl border-2 transition-all duration-100 active:scale-95 active:translate-y-0.5 ${getFontSizeClass()}`;
+
+  const getBtnStyle = (active: boolean) => {
+    if (prefs.highContrast) {
+      return active 
+        ? `${buttonBaseStyle} bg-yellow-400 text-black border-black shadow-[0_0_0_3px_#facc15]` 
+        : `${buttonBaseStyle} bg-black text-yellow-400 border-zinc-700 hover:bg-zinc-900`;
+    }
+    return active 
+      ? `${buttonBaseStyle} bg-blue-600 text-white border-blue-700 shadow-md transform translate-y-px` 
+      : `${buttonBaseStyle} bg-white text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300`;
+  };
 
   return (
-    <div className={`w-full max-w-2xl p-8 rounded-2xl border-4 shadow-xl transition-all duration-200 ${panelBg} ${prefs.spacing === 'wide' ? 'space-y-8' : 'space-y-5'}`}>
+    <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8 text-left p-2">
       
-      <h2 className={`font-bold text-center border-b-2 pb-3 ${prefs.fontSize === 'normal' ? 'text-2xl' : 'text-3xl'} ${prefs.highContrast ? 'border-yellow-400' : 'border-slate-200'}`}>
-        ⚙️ Configurar Opções de Acessibilidade
-      </h2>
+      {/* SEÇÃO DA ESQUERDA: APARÊNCIA */}
+      <div className="space-y-5">
+        <div>
+          <span className={`block font-bold mb-2 ${getFontSizeClass()}`}>Letra na Tela:</span>
+          <div className="flex gap-2 flex-wrap">
+            <button type="button" onClick={() => onChange({ ...prefs, fontSize: 'normal' })} className={getBtnStyle(prefs.fontSize === 'normal')}>Padrão Aa</button>
+            <button type="button" onClick={() => onChange({ ...prefs, fontSize: 'large' })} className={getBtnStyle(prefs.fontSize === 'large')}>Grande Aa</button>
+            <button type="button" onClick={() => onChange({ ...prefs, fontSize: 'extra-large' })} className={getBtnStyle(prefs.fontSize === 'extra-large')}>Muito Grande Aa</button>
+          </div>
+        </div>
 
-      {/* 1. TAMANHO DA FONTE */}
-      <div className="flex flex-col gap-2">
-        <span className={labelSize}>1. Tamanho das Letras:</span>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {(['normal', 'large', 'extra-large'] as const).map((size) => (
-            <button
-              key={size}
-              type="button"
-              onClick={() => updatePref('fontSize', size)}
-              className={`p-4 rounded-xl border-2 transition-all text-center font-bold min-h-[60px] ${prefs.fontSize === size ? btnActive : btnInactive}`}
-            >
-              {size === 'normal' && 'A (Normal)'}
-              {size === 'large' && 'A+ (Grande)'}
-              {size === 'extra-large' && 'A++ (Muito Grande)'}
+        <div>
+          <span className={`block font-bold mb-2 ${getFontSizeClass()}`}>Cores da Tela:</span>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => onChange({ ...prefs, highContrast: false })} className={getBtnStyle(!prefs.highContrast)}>🎨 Cores Normais</button>
+            <button type="button" onClick={() => onChange({ ...prefs, highContrast: true })} className={getBtnStyle(prefs.highContrast)}>⚫ Alto Contraste</button>
+          </div>
+        </div>
+
+        <div>
+          <span className={`block font-bold mb-2 ${getFontSizeClass()}`}>Espaço entre os elementos:</span>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => onChange({ ...prefs, spacing: 'normal' })} className={getBtnStyle(prefs.spacing === 'normal')}>Normal</button>
+            <button type="button" onClick={() => onChange({ ...prefs, spacing: 'wide' })} className={getBtnStyle(prefs.spacing === 'wide')}>Mais Espaço</button>
+          </div>
+        </div>
+      </div>
+
+      {/* SEÇÃO DA DIREITA: SEGURANÇA E NOTIFICAÇÕES */}
+      <div className="space-y-5">
+        <div>
+          <span className={`block font-bold mb-2 ${getFontSizeClass()}`}>Modo de Navegação e Segurança:</span>
+          <div className="flex gap-2 flex-wrap">
+            <button type="button" onClick={() => onChange({ ...prefs, simplifiedMode: !prefs.simplifiedMode })} className={getBtnStyle(prefs.simplifiedMode)}>
+              {prefs.simplifiedMode ? '✨ Modo Simplificado Ligado' : '✨ Usar Modo Simplificado'}
             </button>
-          ))}
+            <button type="button" onClick={() => onChange({ ...prefs, extraConfirmation: !prefs.extraConfirmation })} className={getBtnStyle(prefs.extraConfirmation)}>
+              {prefs.extraConfirmation ? '🔒 Avisos de Segurança Ativos' : '🔒 Ativar Avisos de Segurança'}
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* 2. ESPAÇAMENTO */}
-      <div className="flex flex-col gap-2">
-        <span className={labelSize}>2. Espaço entre os Botões e Textos:</span>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={() => updatePref('spacing', 'normal')}
-            className={`p-4 rounded-xl border-2 font-bold min-h-[60px] ${prefs.spacing === 'normal' ? btnActive : btnInactive}`}
-          >
-            Normal
-          </button>
-          <button
-            type="button"
-            onClick={() => updatePref('spacing', 'wide')}
-            className={`p-4 rounded-xl border-2 font-bold min-h-[60px] ${prefs.spacing === 'wide' ? btnActive : btnInactive}`}
-          >
-            ↔️ Mais Espaçado (Fácil de Tocar)
-          </button>
+        <div>
+          <span className={`block font-bold mb-2 ${getFontSizeClass()}`}>Lembretes de Estudo:</span>
+          <div className="flex gap-2 flex-wrap">
+            <button type="button" onClick={() => onChange({ ...prefs, reminderFrequency: 'none' })} className={getBtnStyle(prefs.reminderFrequency === 'none')}>Não avisar</button>
+            <button type="button" onClick={() => onChange({ ...prefs, reminderFrequency: 'daily' })} className={getBtnStyle(prefs.reminderFrequency === 'daily')}>Todo Dia 📅</button>
+            <button type="button" onClick={() => onChange({ ...prefs, reminderFrequency: 'weekly' })} className={getBtnStyle(prefs.reminderFrequency === 'weekly')}>Toda Semana 🗓️</button>
+          </div>
         </div>
-      </div>
-
-      {/* 3. ALTO CONTRASTE */}
-      <div className="flex flex-col gap-2">
-        <span className={labelSize}>3. Cores da Tela:</span>
-        <button
-          type="button"
-          onClick={() => updatePref('highContrast', !prefs.highContrast)}
-          className={`w-full p-4 rounded-xl font-bold border-2 text-xl min-h-[60px] transition-all ${
-            prefs.highContrast 
-              ? 'bg-yellow-400 text-black border-yellow-400' 
-              : 'bg-zinc-800 text-white border-zinc-800'
-          }`}
-        >
-          {prefs.highContrast ? '⚫ Alto Contraste Ativo' : '⚪ Modo de Cores Padrão'}
-        </button>
-      </div>
-
-      {/* 4. MODALIDADE DE INTERFACE SIMPLIFICADA */}
-      <div className="flex flex-col gap-2">
-        <span className={labelSize}>4. Estilo do Menu:</span>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={() => updatePref('simplifiedMode', false)}
-            className={`p-4 rounded-xl border-2 font-bold min-h-[60px] ${!prefs.simplifiedMode ? btnActive : btnInactive}`}
-          >
-            Modo Completo
-          </button>
-          <button
-            type="button"
-            onClick={() => updatePref('simplifiedMode', true)}
-            className={`p-4 rounded-xl border-2 font-bold min-h-[60px] ${prefs.simplifiedMode ? btnActive : btnInactive}`}
-          >
-            ⭐ Modo Simplificado (Apenas o Básico)
-          </button>
-        </div>
-      </div>
-
-      {/* 5. CONFIRMAÇÃO EXTRA */}
-      <div className="flex flex-col gap-2">
-        <span className={labelSize}>5. Proteção contra Cliques Errados:</span>
-        <button
-          type="button"
-          onClick={() => updatePref('extraConfirmation', !prefs.extraConfirmation)}
-          className={`w-full p-4 rounded-xl font-bold border-2 text-lg min-h-[60px] transition-all ${
-            prefs.extraConfirmation ? btnActive : btnInactive
-          }`}
-        >
-          {prefs.extraConfirmation ? '🔒 Ativado: Perguntar antes de sair ou avançar' : '🔓 Desativado: Avançar direto'}
-        </button>
       </div>
 
     </div>

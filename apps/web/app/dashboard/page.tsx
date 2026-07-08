@@ -2,13 +2,13 @@
 
 import { useRouter } from 'next/navigation';
 import { AccessibilityPreferences } from '../../src/components/AccessibilityPanel';
+import { useAccessibility } from '../../src/context/AccessibilityContext';
 
 interface DashboardPageProps {
   prefs?: AccessibilityPreferences;
   userName?: string;
 }
 
-// Banco de dados centralizado e consistente com o Mobile
 const COURSES_DATA = [
   {
     id: 'informatica-basica',
@@ -33,19 +33,21 @@ const COURSES_DATA = [
   }
 ];
 
-export default function DashboardPage({ prefs, userName = 'Estudante' }: DashboardPageProps) {
+export default function DashboardPage() {
   const router = useRouter();
+  const { prefs, userName } = useAccessibility();
 
-  // Valores de fallback seguros para evitar quebras se o layout pai atrasar a carga
-  const currentPrefs = prefs || {
-    fontSize: 'normal',
-    highContrast: false,
-    spacing: 'normal',
-    simplifiedMode: false,
-    extraConfirmation: false
+  // Mapeamento completo e seguro com os fallbacks corretos para evitar quebras
+  const currentPrefs = {
+    fontSize: prefs?.fontSize || 'normal',
+    highContrast: prefs?.highContrast || false,
+    spacing: prefs?.spacing || 'normal',
+    simplifiedMode: prefs?.simplifiedMode || false,
+    extraConfirmation: prefs?.extraConfirmation || false,
+    reminderFrequency: prefs?.reminderFrequency || 'none'
   };
 
-  // 📐 Escalonamento tipográfico proporcional (Pertinente ao Web)
+  // 📐 Escalonamento tipográfico proporcional
   const getTitleSizeClass = () => {
     if (currentPrefs.fontSize === 'large') return 'text-4xl';
     if (currentPrefs.fontSize === 'extra-large') return 'text-5xl';
@@ -68,6 +70,7 @@ export default function DashboardPage({ prefs, userName = 'Estudante' }: Dashboa
   };
 
   const handleCourseClick = (courseId: string, courseTitle: string) => {
+    // 🔒 MODO DE SEGURANÇA: Só dispara o confirm se a flag estiver explicitamente ativa
     if (currentPrefs.extraConfirmation) {
       const confirmar = window.confirm(`Deseja mesmo entrar nas aulas de:\n"${courseTitle}"?`);
       if (!confirmar) return;
@@ -76,9 +79,10 @@ export default function DashboardPage({ prefs, userName = 'Estudante' }: Dashboa
   };
 
   return (
-    <div className={`w-full max-w-7xl mx-auto ${currentPrefs.spacing === 'wide' ? 'space-y-12' : 'space-y-6'}`}>
-      
-      {/* 🔝 CABEÇALHO IDÊNTICO AO MOBILE (ADAPTADO À LARGURA DA WEB) */}
+    // ↔️ ESPAÇAMENTO ENTRE ELEMENTOS: Aplica dinamicamente o recuo vertical maior no container
+    <div className={`w-full max-w-7xl mx-auto transition-all ${currentPrefs.spacing === 'wide' ? 'space-y-16' : 'space-y-6'}`}>
+
+      {/* Cabeçalho */}
       <div className={`pb-6 border-b-4 ${currentPrefs.highContrast ? 'border-yellow-400' : 'border-slate-100'}`}>
         <h1 className={`${getTitleSizeClass()} font-extrabold tracking-tight`}>
           Olá, {userName}! 👋
@@ -88,28 +92,30 @@ export default function DashboardPage({ prefs, userName = 'Estudante' }: Dashboa
         </p>
       </div>
 
-      {/* 📚 LISTAGEM EM GRID RESPONSIVO (3 colunas em desktops, 1 em telas pequenas) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      {/* 📚 GRADE DE CURSOS - Ajustando o gap (espaço entre os botões/cards) com base na escolha do usuário */}
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 transition-all ${currentPrefs.spacing === 'wide' ? 'gap-12' : 'gap-6'
+        }`}>
         {COURSES_DATA.map((course) => (
           <div
             key={course.id}
-            className={`rounded-2xl border-4 shadow-md flex flex-col justify-between transition-all duration-200 ${theme.cardBg} ${
-              currentPrefs.spacing === 'wide' ? 'p-8 gap-8' : 'p-6 gap-4'
-            }`}
+            className={`rounded-2xl border-4 shadow-md flex flex-col justify-between transition-all ${theme.cardBg} ${
+              // ↔️ ESPAÇAMENTO INTERNO (PADDING) DO CARD AJUSTADO
+              currentPrefs.spacing === 'wide' ? 'p-10 gap-10' : 'p-6 gap-4'
+              }`}
           >
             {/* Bloco de Informações */}
-            <div className="space-y-3">
+            <div className={currentPrefs.spacing === 'wide' ? 'space-y-6' : 'space-y-3'}>
               <h2 className={`font-bold leading-tight ${currentPrefs.fontSize === 'normal' ? 'text-2xl' : 'text-3xl'}`}>
                 {course.title}
               </h2>
-              
-              {/* Oculta textos longos e descrições se o "Modo Simplificado" estiver ativo */}
+
+              {/* ✨ MODO SIMPLIFICADO: Esconde completamente o bloco de descrição para remover a sobrecarga cognitiva */}
               {!currentPrefs.simplifiedMode ? (
                 <p className={`${getFontSizeClass()} leading-relaxed opacity-85`}>
                   {course.description}
                 </p>
               ) : (
-                <div className="py-1 border-b border-dashed border-zinc-700 opacity-40" />
+                <div className="py-1 border-b border-dashed opacity-20" />
               )}
 
               <span className={`inline-block font-semibold ${theme.textMuted} ${getFontSizeClass()}`}>
@@ -117,8 +123,8 @@ export default function DashboardPage({ prefs, userName = 'Estudante' }: Dashboa
               </span>
             </div>
 
-            {/* PROGRESSO EM BARRA ACESSÍVEL */}
-            <div className="space-y-2 mt-4">
+            {/* Progresso */}
+            <div className={currentPrefs.spacing === 'wide' ? 'space-y-4' : 'space-y-2'}>
               <div className="flex justify-between items-center font-bold">
                 <span className={getFontSizeClass()}>
                   {course.progress === 0 ? '🚫 Não iniciado' : course.progress === 100 ? '✅ Concluído!' : '⏳ No meio'}
@@ -126,19 +132,22 @@ export default function DashboardPage({ prefs, userName = 'Estudante' }: Dashboa
                 <span className={getFontSizeClass()}>{course.progress}%</span>
               </div>
               <div className={`w-full h-7 rounded-full overflow-hidden border-2 shadow-inner ${theme.barBg}`}>
-                <div 
-                  className={`h-full transition-all duration-500 ${theme.barFill}`} 
+                <div
+                  className={`h-full transition-all duration-500 ${theme.barFill}`}
                   style={{ width: `${course.progress}%` }}
                 />
               </div>
             </div>
 
-            {/* BOTÃO MASSIVO DE TOQUE/CLIQUE */}
             <button
               onClick={() => handleCourseClick(course.id, course.title)}
-              className={`w-full mt-4 py-4 rounded-xl font-bold transition-transform active:scale-[0.98] border-2 shadow-md ${theme.btn} ${
-                currentPrefs.fontSize === 'normal' ? 'text-xl' : 'text-2xl'
-              }`}
+              className={`w-full py-4 rounded-xl font-bold border-2 shadow-md transition-all duration-100 ${theme.btn} ${currentPrefs.fontSize === 'normal' ? 'text-xl' : 'text-2xl'
+                } ${
+                // RESPOSTA VISUAL INDEPENDENTE E COERENTE:
+                currentPrefs.highContrast
+                  ? 'border-yellow-400 active:scale-95 active:bg-zinc-900 active:text-yellow-400'
+                  : 'border-slate-900 hover:bg-slate-800 active:scale-95 active:bg-slate-950 shadow-[0_4px_0_0_#0f172a] active:shadow-none active:translate-y-1'
+                }`}
             >
               Entrar no Curso ➔
             </button>
