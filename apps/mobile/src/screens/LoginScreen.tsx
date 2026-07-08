@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { AccessibilityPanel, AccessibilityPreferences } from '../components/AccessibilityPanel';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 
 interface LoginScreenProps {
   onAuthSuccess?: () => void;
@@ -19,15 +21,14 @@ export function LoginScreen({ onAuthSuccess }: LoginScreenProps) {
     extraConfirmation: false,
   });
 
-  // 2. Estados de fluxo de tela
   const [screenState, setScreenState] = useState<ScreenState>('WELCOME');
   const [isRegistering, setIsRegistering] = useState(false);
 
-  // 3. Estados dos campos do formulário
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  // Auxiliares de estilização dinâmica baseada nas preferências
   const getFontSize = (type: 'title' | 'body' | 'button') => {
     const modifier = prefs.fontSize === 'extra-large' ? 6 : prefs.fontSize === 'large' ? 3 : 0;
     if (type === 'title') return 24 + modifier;
@@ -56,7 +57,7 @@ export function LoginScreen({ onAuthSuccess }: LoginScreenProps) {
   const handleAuthAction = () => {
     if (prefs.extraConfirmation) {
       Alert.alert(
-        "Confirmar", 
+        "Confirmar",
         isRegistering ? "Deseja criar sua conta com esses dados?" : "Deseja entrar no sistema?",
         [
           { text: "Voltar", style: "cancel" },
@@ -68,17 +69,39 @@ export function LoginScreen({ onAuthSuccess }: LoginScreenProps) {
     }
   };
 
+  const executeAuth = async () => {
+    setLoading(true);
+    try {
+      if (isRegistering) {
+        // Criação de conta (opcional caso queira testar por aqui)
+        // await createUserWithEmailAndPassword(auth, email, password);
+      } else {
+        // 🌟 Faz login real usando o usuário da Web
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+
+      // Se o seu App.tsx escuta o onAuthStateChanged, ele mudará de tela sozinho.
+      // Caso use callback, dispare-o aqui:
+      if (onAuthSuccess) onAuthSuccess();
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert("Erro ao entrar", "E-mail ou senha incorretos. Verifique os dados digitados na Web.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.bg }]}>
       <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }, spacingStyle]}>
-        
+
         {/* ================= ESTADO 1: ESCOLHA INICIAL (IGUAL A WEB) ================= */}
         {screenState === 'WELCOME' && (
           <>
             <Text style={[styles.title, { color: theme.text, fontSize: getFontSize('title') }]}>
               Olá! Bem-vindo ao SeniorEase 🌟
             </Text>
-            
+
             <Text style={[styles.subtitle, { color: theme.text, fontSize: getFontSize('body') }]}>
               Preparamos um espaço simples para você aprender. Como deseja começar hoje?
             </Text>
@@ -143,6 +166,7 @@ export function LoginScreen({ onAuthSuccess }: LoginScreenProps) {
               </View>
             )}
 
+            {/* CAMPO DE E-MAIL */}
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: theme.text, fontSize: getFontSize('body') }]}>Seu E-mail:</Text>
               <TextInput
@@ -156,16 +180,54 @@ export function LoginScreen({ onAuthSuccess }: LoginScreenProps) {
               />
             </View>
 
+            {/* 🔒 NOVO CAMPO: SENHA ADAPTADA */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: theme.text, fontSize: getFontSize('body') }]}>Sua Senha:</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.border, color: theme.text, fontSize: getFontSize('body') }]}
+                placeholder="Digite sua senha"
+                placeholderTextColor={prefs.highContrast ? '#777' : '#94a3b8'}
+                secureTextEntry={true} // Esconde os caracteres da senha
+                autoCapitalize="none"
+                value={password}
+                onChangeText={setPassword}
+              />
+            </View>
+
             <View style={[styles.buttonGroup, { marginTop: 10, gap: prefs.spacing === 'wide' ? 16 : 10 }]}>
-              <TouchableOpacity style={[styles.btn, { backgroundColor: theme.btnPrimary }]} onPress={handleAuthAction}>
+              {/* Botão de Entrar/Cadastrar reativo */}
+              <TouchableOpacity
+                style={[styles.btn, { backgroundColor: theme.btnPrimary, opacity: loading ? 0.6 : 1 }]}
+                onPress={async () => {
+                  if (!email || !password) {
+                    Alert.alert("Aviso", "Por favor, preencha todos os campos.");
+                    return;
+                  }
+
+                  if (prefs.extraConfirmation) {
+                    Alert.alert(
+                      "Confirmar",
+                      isRegistering ? "Deseja criar sua conta agora?" : "Deseja entrar com este e-mail?",
+                      [
+                        { text: "Voltar", style: "cancel" },
+                        { text: "Sim, Entrar", onPress: executeAuth }
+                      ]
+                    );
+                  } else {
+                    executeAuth();
+                  }
+                }}
+                disabled={loading}
+              >
                 <Text style={[styles.btnText, { color: theme.btnPrimaryText, fontSize: getFontSize('button') }]}>
-                  {isRegistering ? 'Confirmar Cadastro ➔' : 'Entrar Agora ➔'}
+                  {loading ? 'Carregando...' : isRegistering ? 'Confirmar Cadastro ➔' : 'Entrar Agora ➔'}
                 </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={[styles.btn, { backgroundColor: 'transparent' }]} 
+              <TouchableOpacity
+                style={[styles.btn, { backgroundColor: 'transparent' }]}
                 onPress={() => setScreenState('WELCOME')}
+                disabled={loading}
               >
                 <Text style={[styles.linkBtnText, { color: theme.text, fontSize: getFontSize('body'), textDecorationLine: 'none' }]}>
                   ⬅️ Voltar para o início
