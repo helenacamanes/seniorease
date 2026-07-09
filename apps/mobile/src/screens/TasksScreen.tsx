@@ -70,7 +70,7 @@ export default function TasksScreen({ activeCourseFilter, onClearFilter }: Tasks
         {activeCourseFilter && (
           <View style={[styles.filterAlert, { backgroundColor: theme.card, borderColor: theme.borderColor }]}>
             <Text style={[styles.filterText, { fontSize: getFontSize('body'), color: theme.text }]}>
-              Mostrando tarefas de: <Text style={{ fontWeight: '950' }}>{currentCourseName}</Text>
+              Mostrando tarefas de: <Text style={{ fontWeight: '900' }}>{currentCourseName}</Text>
             </Text>
             <Pressable
               onPress={onClearFilter}

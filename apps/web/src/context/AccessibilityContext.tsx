@@ -7,11 +7,22 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 import { AccessibilityPreferences } from '@seniorease/domain'; 
 
-interface AccessibilityContextType {
-  prefs: AccessibilityPreferences;
-  userName: string;
+export interface AccessibilityContextType {
+  prefs: {
+    fontSize: 'normal' | 'large' | 'extra-large';
+    spacing: 'normal' | 'wide';
+    highContrast: boolean;
+  };
+  // optional setter when direct state update is needed
+  setPrefs?: React.Dispatch<React.SetStateAction<{
+    fontSize: 'normal' | 'large' | 'extra-large';
+    spacing: 'normal' | 'wide';
+    highContrast: boolean;
+  }>>;
+  // function to persist and apply preferences
   updatePrefs: (newPrefs: AccessibilityPreferences) => Promise<void>;
   loading: boolean;
+  userName?: string;
 }
 
 const AccessibilityContext = createContext<AccessibilityContextType | undefined>(undefined);
