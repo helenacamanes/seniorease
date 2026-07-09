@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth, db } from '../lib/firebase'; // caminho do seu firebase mobile
+import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 // 🌟 O IMPORT DO SEU PACOTE ENTRA AQUI TAMBÉM:
-import { AccessibilityPreferences } from '@seniorease/domain'; 
+import { AccessibilityPreferences } from '@seniorease/domain';
 
 interface AccessibilityContextType {
   prefs: AccessibilityPreferences;
@@ -36,9 +36,12 @@ export function AccessibilityProvider({ children }: { children: React.ReactNode 
             const data = userDoc.data();
             setUserName(data.displayName || user.email?.split('@')[0] || 'Estudante');
             if (data.preferences) setPrefs(data.preferences);
+          } else {
+            setUserName(user.email?.split('@')[0] || 'Estudante');
           }
         } catch (e) {
-          console.error('Erro ao buscar preferências mobile:', e);
+          console.error('Erro ao buscar preferências, prosseguindo com padrão:', e);
+          setUserName(user.email?.split('@')[0] || 'Estudante');
         }
       }
       setLoading(false);

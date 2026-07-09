@@ -5,7 +5,6 @@ import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
-// 🌟 O IMPORT DO SEU PACOTE ENTRA AQUI:
 import { AccessibilityPreferences } from '@seniorease/domain'; 
 
 interface AccessibilityContextType {

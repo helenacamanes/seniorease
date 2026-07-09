@@ -1,32 +1,52 @@
 import React, { useState, useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { StatusBar, StyleSheet, View, ActivityIndicator } from 'react-native';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './src/lib/firebase';
 
-// 🌟 Importações limpas das telas separadas
+// 🌟 SUBSTITUÍMOS O IMPORT DO REACT-NATIVE POR ESTES DO SAFE-AREA-CONTEXT:
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+
+import { AccessibilityProvider } from './src/context/AccessibilityContext';
 import {LoginScreen} from './src/screens/LoginScreen';
-import {DashboardScreen} from './src/screens/DashboardScreen';
+import MainTabNavigator from './src/navigation/MainTabNavigator'; 
 
 export default function App() {
-  const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
-      setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (initializing) setInitializing(false);
     });
+    return unsubscribe;
+  }, [initializing]);
 
-    return () => unsubscribe();
-  }, []);
-
-  if (loading) {
+  if (initializing) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc' }}>
-        <ActivityIndicator size="large" color="#059669" />
+        <ActivityIndicator size="large" color="#1e40af" />
       </View>
     );
   }
 
-  return user ? <DashboardScreen /> : <LoginScreen />;
+  return (
+    // 🌟 EMBRULHAMOS COM O PROVIDER DA NOVA BIBLIOTECA:
+    <SafeAreaProvider>
+      <AccessibilityProvider>
+        <SafeAreaView style={styles.container}>
+          <StatusBar barStyle="dark-content" />
+          
+          {user ? <MainTabNavigator /> : <LoginScreen />}
+
+        </SafeAreaView>
+      </AccessibilityProvider>
+    </SafeAreaProvider>
+  );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});
