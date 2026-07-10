@@ -1,11 +1,12 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
+import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import {
   initializeAuth,
-  getReactNativePersistence,
   browserLocalPersistence,
+  getReactNativePersistence
 } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { getFirestore } from 'firebase/firestore';
 
 // Suas credenciais do Firebase (carregadas automaticamente pelo Expo através do .env)
 const firebaseConfig = {
@@ -17,10 +18,10 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Inicializa o App prevenindo duplicidade no Fast Refresh
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Persistência: AsyncStorage em nativo, localStorage do navegador na web
+const db = getFirestore(app);
+
 const auth = initializeAuth(app, {
   persistence:
     Platform.OS === 'web'
@@ -28,4 +29,4 @@ const auth = initializeAuth(app, {
       : getReactNativePersistence(AsyncStorage),
 });
 
-export { app, auth };
+export { app, auth, db };

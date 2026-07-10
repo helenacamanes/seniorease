@@ -2,17 +2,17 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { AccessibilityPanel, AccessibilityPreferences } from '../components/AccessibilityPanel';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../lib/firebase';
+// 🌟 IMPORTANTE: Puxamos o auth e o db locais do mobile
+import { auth, db } from '../lib/firebase'; 
+import { inicializarPerfilE_Tarefas } from '@seniorease/domain';
 
 interface LoginScreenProps {
   onAuthSuccess?: () => void;
 }
 
-// Tipo para controlar qual etapa o idoso está vendo na tela
 type ScreenState = 'WELCOME' | 'FORM' | 'PREFERENCES';
 
 export function LoginScreen({ onAuthSuccess }: LoginScreenProps) {
-  // 1. Estado de preferências (idêntico ao Web)
   const [prefs, setPrefs] = useState<AccessibilityPreferences>({
     fontSize: 'normal',
     highContrast: false,
@@ -27,6 +27,7 @@ export function LoginScreen({ onAuthSuccess }: LoginScreenProps) {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [selectedCourse, setSelectedCourse] = useState('');
   const [loading, setLoading] = useState(false);
 
   const getFontSize = (type: 'title' | 'body' | 'button') => {
@@ -53,39 +54,23 @@ export function LoginScreen({ onAuthSuccess }: LoginScreenProps) {
     padding: prefs.spacing === 'wide' ? 24 : 16,
   };
 
-  // Ações de clique
-  const handleAuthAction = () => {
-    if (prefs.extraConfirmation) {
-      Alert.alert(
-        "Confirmar",
-        isRegistering ? "Deseja criar sua conta com esses dados?" : "Deseja entrar no sistema?",
-        [
-          { text: "Voltar", style: "cancel" },
-          { text: "Sim, Avançar", onPress: () => { if (onAuthSuccess) onAuthSuccess(); } }
-        ]
-      );
-    } else {
-      if (onAuthSuccess) onAuthSuccess();
-    }
-  };
-
   const executeAuth = async () => {
     setLoading(true);
     try {
       if (isRegistering) {
-        // Criação de conta (opcional caso queira testar por aqui)
-        // await createUserWithEmailAndPassword(auth, email, password);
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        
+        // 🌟 INVERSÃO DE DEPENDÊNCIA APLICADA NO MOBILE: Injeta o 'db' do Mobile
+        await inicializarPerfilE_Tarefas(db, userCredential.user.uid, name, email, selectedCourse);
+        
+        Alert.alert("Sucesso!", "Sua conta foi criada e suas atividades foram configuradas com sucesso.");
       } else {
-        // 🌟 Faz login real usando o usuário da Web
         await signInWithEmailAndPassword(auth, email, password);
       }
-
-      // Se o seu App.tsx escuta o onAuthStateChanged, ele mudará de tela sozinho.
-      // Caso use callback, dispare-o aqui:
       if (onAuthSuccess) onAuthSuccess();
     } catch (error: any) {
       console.error(error);
-      Alert.alert("Erro ao entrar", "E-mail ou senha incorretos. Verifique os dados digitados na Web.");
+      Alert.alert("Erro", "Falha na autenticação. Verifique os dados digitados.");
     } finally {
       setLoading(false);
     }
@@ -95,160 +80,81 @@ export function LoginScreen({ onAuthSuccess }: LoginScreenProps) {
     <ScrollView contentContainerStyle={[styles.container, { backgroundColor: theme.bg }]}>
       <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }, spacingStyle]}>
 
-        {/* ================= ESTADO 1: ESCOLHA INICIAL (IGUAL A WEB) ================= */}
         {screenState === 'WELCOME' && (
           <>
-            <Text style={[styles.title, { color: theme.text, fontSize: getFontSize('title') }]}>
-              Olá! Bem-vindo ao SeniorEase 🌟
-            </Text>
-
-            <Text style={[styles.subtitle, { color: theme.text, fontSize: getFontSize('body') }]}>
-              Preparamos um espaço simples para você aprender. Como deseja começar hoje?
-            </Text>
-
+            <Text style={[styles.title, { color: theme.text, fontSize: getFontSize('title') }]}>Olá! Bem-vindo ao SeniorEase 🌟</Text>
+            <Text style={[styles.subtitle, { color: theme.text, fontSize: getFontSize('body') }]}>Preparamos um espaço simples para você aprender. Como deseja começar hoje?</Text>
             <View style={[styles.buttonGroup, { gap: prefs.spacing === 'wide' ? 20 : 12 }]}>
-              {/* Opção 1: Login */}
-              <TouchableOpacity
-                style={[styles.btn, { backgroundColor: theme.btnPrimary }]}
-                onPress={() => {
-                  setIsRegistering(false);
-                  setScreenState('FORM');
-                }}
-              >
-                <Text style={[styles.btnText, { color: theme.btnPrimaryText, fontSize: getFontSize('button') }]}>
-                  👋 Já tenho conta (Entrar)
-                </Text>
+              <TouchableOpacity style={[styles.btn, { backgroundColor: theme.btnPrimary }]} onPress={() => { setIsRegistering(false); setScreenState('FORM'); }}>
+                <Text style={[styles.btnText, { color: theme.btnPrimaryText, fontSize: getFontSize('button') }]}>👋 Já tenho conta (Entrar)</Text>
               </TouchableOpacity>
-
-              {/* Opção 2: Registro */}
-              <TouchableOpacity
-                style={[styles.btn, { backgroundColor: theme.btnSecondary, borderWidth: 2, borderColor: theme.border }]}
-                onPress={() => {
-                  setIsRegistering(true);
-                  setScreenState('FORM');
-                }}
-              >
-                <Text style={[styles.btnText, { color: theme.btnSecondaryText, fontSize: getFontSize('button') }]}>
-                  📝 Quero me cadastrar
-                </Text>
+              <TouchableOpacity style={[styles.btn, { backgroundColor: theme.btnSecondary, borderWidth: 2, borderColor: theme.border }]} onPress={() => { setIsRegistering(true); setScreenState('FORM'); }}>
+                <Text style={[styles.btnText, { color: theme.btnSecondaryText, fontSize: getFontSize('button') }]}>📝 Quero me cadastrar</Text>
               </TouchableOpacity>
-
-              {/* Opção 3: Preferências de Acessibilidade */}
-              <TouchableOpacity
-                style={styles.linkBtn}
-                onPress={() => setScreenState('PREFERENCES')}
-              >
-                <Text style={[styles.linkBtnText, { color: prefs.highContrast ? '#ffff00' : '#2563eb', fontSize: getFontSize('body') }]}>
-                  ⚙️ Ajustar as Letras, Cores e Espaçamento
-                </Text>
+              <TouchableOpacity style={styles.linkBtn} onPress={() => setScreenState('PREFERENCES')}>
+                <Text style={[styles.linkBtnText, { color: prefs.highContrast ? '#ffff00' : '#2563eb', fontSize: getFontSize('body') }]}>⚙️ Ajustar Letras e Cores</Text>
               </TouchableOpacity>
             </View>
           </>
         )}
 
-        {/* ================= ESTADO 2: FORMULÁRIO ADAPTADO ================= */}
         {screenState === 'FORM' && (
           <>
-            <Text style={[styles.title, { color: theme.text, fontSize: getFontSize('title') }]}>
-              {isRegistering ? 'Criar Nova Conta' : 'Entrar no Sistema'}
-            </Text>
-
+            <Text style={[styles.title, { color: theme.text, fontSize: getFontSize('title') }]}>{isRegistering ? 'Criar Nova Conta' : 'Entrar no Sistema'}</Text>
+            
             {isRegistering && (
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: theme.text, fontSize: getFontSize('body') }]}>Seu Nome Completo:</Text>
-                <TextInput
-                  style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.border, color: theme.text, fontSize: getFontSize('body') }]}
-                  placeholder="Digite seu nome aqui"
-                  placeholderTextColor={prefs.highContrast ? '#777' : '#94a3b8'}
-                  value={name}
-                  onChangeText={setName}
-                />
+                <TextInput style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.border, color: theme.text, fontSize: getFontSize('body') }]} placeholder="Digite seu nome" placeholderTextColor="#94a3b8" value={name} onChangeText={setName} />
               </View>
             )}
 
-            {/* CAMPO DE E-MAIL */}
+            {isRegistering && (
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: theme.text, fontSize: getFontSize('body') }]}>Escolha sua Turma: <Text style={{ color: '#ef4444' }}>*</Text></Text>
+                <View style={{ gap: 10, marginTop: 4 }}>
+                  <TouchableOpacity style={[styles.courseOption, { borderColor: selectedCourse === 'tecnologia-iniciantes' ? theme.btnPrimary : theme.border }, selectedCourse === 'tecnologia-iniciantes' && { backgroundColor: '#e0f2fe' }]} onPress={() => setSelectedCourse('tecnologia-iniciantes')}>
+                    <Text style={{ fontSize: getFontSize('body'), color: theme.text, fontWeight: 'bold' }}>{selectedCourse === 'tecnologia-iniciantes' ? '🟢 ' : '⚪ '} Tecnologia para Iniciantes</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.courseOption, { borderColor: selectedCourse === 'smartphone-whatsapp' ? theme.btnPrimary : theme.border }, selectedCourse === 'smartphone-whatsapp' && { backgroundColor: '#e0f2fe' }]} onPress={() => setSelectedCourse('smartphone-whatsapp')}>
+                    <Text style={{ fontSize: getFontSize('body'), color: theme.text, fontWeight: 'bold' }}>{selectedCourse === 'smartphone-whatsapp' ? '🟢 ' : '⚪ '} Uso do Smartphone e Whatsapp</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: theme.text, fontSize: getFontSize('body') }]}>Seu E-mail:</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.border, color: theme.text, fontSize: getFontSize('body') }]}
-                placeholder="exemplo@email.com"
-                placeholderTextColor={prefs.highContrast ? '#777' : '#94a3b8'}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={email}
-                onChangeText={setEmail}
-              />
+              <TextInput style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.border, color: theme.text, fontSize: getFontSize('body') }]} placeholder="exemplo@email.com" placeholderTextColor="#94a3b8" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
             </View>
 
-            {/* 🔒 NOVO CAMPO: SENHA ADAPTADA */}
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: theme.text, fontSize: getFontSize('body') }]}>Sua Senha:</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.border, color: theme.text, fontSize: getFontSize('body') }]}
-                placeholder="Digite sua senha"
-                placeholderTextColor={prefs.highContrast ? '#777' : '#94a3b8'}
-                secureTextEntry={true} // Esconde os caracteres da senha
-                autoCapitalize="none"
-                value={password}
-                onChangeText={setPassword}
-              />
+              <TextInput style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.border, color: theme.text, fontSize: getFontSize('body') }]} placeholder="Digite sua senha" placeholderTextColor="#94a3b8" secureTextEntry={true} autoCapitalize="none" value={password} onChangeText={setPassword} />
             </View>
 
-            <View style={[styles.buttonGroup, { marginTop: 10, gap: prefs.spacing === 'wide' ? 16 : 10 }]}>
-              {/* Botão de Entrar/Cadastrar reativo */}
-              <TouchableOpacity
-                style={[styles.btn, { backgroundColor: theme.btnPrimary, opacity: loading ? 0.6 : 1 }]}
-                onPress={async () => {
-                  if (!email || !password) {
-                    Alert.alert("Aviso", "Por favor, preencha todos os campos.");
-                    return;
-                  }
-
-                  if (prefs.extraConfirmation) {
-                    Alert.alert(
-                      "Confirmar",
-                      isRegistering ? "Deseja criar sua conta agora?" : "Deseja entrar com este e-mail?",
-                      [
-                        { text: "Voltar", style: "cancel" },
-                        { text: "Sim, Entrar", onPress: executeAuth }
-                      ]
-                    );
-                  } else {
-                    executeAuth();
-                  }
-                }}
-                disabled={loading}
-              >
-                <Text style={[styles.btnText, { color: theme.btnPrimaryText, fontSize: getFontSize('button') }]}>
-                  {loading ? 'Carregando...' : isRegistering ? 'Confirmar Cadastro ➔' : 'Entrar Agora ➔'}
-                </Text>
+            <View style={[styles.buttonGroup, { marginTop: 10, gap: 12 }]}>
+              <TouchableOpacity style={[styles.btn, { backgroundColor: theme.btnPrimary }]} onPress={() => {
+                if (!email || !password || (isRegistering && (!name || !selectedCourse))) {
+                  Alert.alert("Aviso", "Preencha todos os campos e selecione a sua turma.");
+                  return;
+                }
+                executeAuth();
+              }}>
+                <Text style={[styles.btnText, { color: theme.btnPrimaryText, fontSize: getFontSize('button') }]}>{loading ? 'Carregando...' : isRegistering ? 'Confirmar Cadastro ➔' : 'Entrar Agora ➔'}</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.btn, { backgroundColor: 'transparent' }]}
-                onPress={() => setScreenState('WELCOME')}
-                disabled={loading}
-              >
-                <Text style={[styles.linkBtnText, { color: theme.text, fontSize: getFontSize('body'), textDecorationLine: 'none' }]}>
-                  ⬅️ Voltar para o início
-                </Text>
+              <TouchableOpacity style={[styles.btn, { backgroundColor: 'transparent' }]} onPress={() => setScreenState('WELCOME')}>
+                <Text style={[styles.linkBtnText, { color: theme.text, fontSize: getFontSize('body'), textDecorationLine: 'none' }]}>⬅️ Voltar para o início</Text>
               </TouchableOpacity>
             </View>
           </>
         )}
 
-        {/* ================= ESTADO 3: PAINEL DE ACESSIBILIDADE ================= */}
         {screenState === 'PREFERENCES' && (
           <View style={{ gap: 20 }}>
             <AccessibilityPanel prefs={prefs} onChange={setPrefs} />
-
-            <TouchableOpacity
-              style={[styles.btn, { backgroundColor: prefs.highContrast ? '#ffff00' : '#1e293b' }]}
-              onPress={() => setScreenState('WELCOME')}
-            >
-              <Text style={{ color: prefs.highContrast ? '#000000' : '#ffffff', fontWeight: 'bold', fontSize: getFontSize('button') }}>
-                ✔️ Pronto, Voltar para o Início
-              </Text>
+            <TouchableOpacity style={[styles.btn, { backgroundColor: '#1e293b' }]} onPress={() => setScreenState('WELCOME')}>
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: getFontSize('button') }}>✔️ Pronto, Voltar</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -271,4 +177,5 @@ const styles = StyleSheet.create({
   inputGroup: { flexDirection: 'column', gap: 6, width: '100%' },
   label: { fontWeight: '600' },
   input: { borderWidth: 2, padding: 14, borderRadius: 12, minHeight: 56 },
+  courseOption: { borderWidth: 2, padding: 16, borderRadius: 12, backgroundColor: '#ffffff', minHeight: 56, justifyContent: 'center' },
 });

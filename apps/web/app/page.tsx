@@ -10,13 +10,13 @@ export default function WelcomePage() {
   const router = useRouter();
   const [showPreferences, setShowPreferences] = useState(false);
 
-  // Estado único baseado no objeto do painel
   const [prefs, setPrefs] = useState<AccessibilityPreferences>({
     fontSize: 'normal',
     highContrast: false,
     spacing: 'normal',
     simplifiedMode: false,
-    extraConfirmation: false
+    extraConfirmation: false,
+    reminderFrequency: 'none'
   });
 
   const getFontSizeClass = () => {

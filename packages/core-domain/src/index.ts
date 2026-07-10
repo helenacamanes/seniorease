@@ -11,3 +11,4 @@ export const getGuidedSteps = (taskTitle: string): string[] => {
 
 export * from './use-cases/AuthValidator';
 export * from './accessibility/preferences';
+export * from './use-cases/UserDataInitializer';

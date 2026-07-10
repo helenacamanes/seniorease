@@ -1,210 +1,130 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-native';
-import { useAccessibility } from '../context/AccessibilityContext';
+import React, { useState, useEffect } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { db, auth } from '../lib/firebase'; // 🌟 Importa o db e auth locais do mobile
+import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 
-const INITIAL_TASKS = [
-  { id: 't1', courseId: 'curso-ti', courseName: '💻 Celular e Internet', title: 'Assistir: Como enviar mensagens no WhatsApp', completed: false, description: 'Um vídeo curto de 3 minutos explicando o passo a passo para mandar mensagens e áudios para seus amigos e familiares.' },
-  { id: 't2', courseId: 'curso-ti', courseName: '💻 Celular e Internet', title: 'Prática: Enviar uma foto para um contato', completed: true, description: 'Abra o seu aplicativo de mensagens e treine o envio de uma foto da sua galeria.' },
-  { id: 't3', courseId: 'curso-financas', courseName: '💰 Finanças Pessoais', title: 'Assistir: O que é o PIX e como ele funciona?', completed: false, description: 'Entenda de forma simples e segura como fazer e receber transferências instantâneas pelo banco.' }
-];
-
-interface TasksScreenProps {
-  activeCourseFilter: string | null;
-  onClearFilter: () => void;
+interface Task {
+  id: string;
+  title: string;
+  completed: boolean;
+  category: string;
 }
 
-export default function TasksScreen({ activeCourseFilter, onClearFilter }: TasksScreenProps) {
-  const { prefs } = useAccessibility();
-  const [tasks, setTasks] = useState(INITIAL_TASKS);
-  const [selectedTask, setSelectedTask] = useState<typeof INITIAL_TASKS[0] | null>(null);
+export default function TasksScreen() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Pega o ID do idoso atualmente logado no aplicativo
+  const userId = auth.currentUser?.uid;
 
-  const getFontSize = (type: 'title' | 'body') => {
-    const isLarge = prefs.fontSize === 'large';
-    const isExtra = prefs.fontSize === 'extra-large';
-    return type === 'title' ? (isExtra ? 26 : isLarge ? 22 : 18) : (isExtra ? 20 : isLarge ? 17 : 14);
-  };
-
-  const theme = {
-    container: prefs.highContrast ? '#000000' : '#f8fafc',
-    card: prefs.highContrast ? '#121212' : '#ffffff',
-    borderColor: prefs.highContrast ? '#facc15' : '#e2e8f0',
-    text: prefs.highContrast ? '#facc15' : '#1e293b',
-    textMuted: prefs.highContrast ? '#eab308' : '#64748b',
-    headerText: prefs.highContrast ? '#ffffff' : '#0f172a',
-    buttonActiveBg: prefs.highContrast ? '#16a34a' : '#22c55e',
-    buttonActiveText: '#ffffff',
-    buttonClearBg: prefs.highContrast ? '#222222' : '#f1f5f9',
-    buttonClearText: prefs.highContrast ? '#facc15' : '#334155',
-  };
-
-  // 🌟 FILTRAGEM DINÂMICA: Filtra por curso se houver um id ativo
-  const filteredTasks = activeCourseFilter
-    ? tasks.filter(t => t.courseId === activeCourseFilter)
-    : tasks;
-
-  const activeTasks = filteredTasks.filter(t => !t.completed);
-  const finishedTasks = filteredTasks.filter(t => t.completed);
-
-  // Captura o nome amigável do curso filtrado
-  const currentCourseName = activeCourseFilter && filteredTasks.length > 0
-    ? filteredTasks[0].courseName
-    : '';
-
-  const toggleTaskCompletion = (taskId: string, isCompleted: boolean) => {
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, completed: !isCompleted } : t));
-
-    // Se marcou como concluída, avisa de forma simples e motivadora
-    if (!isCompleted) {
-      Alert.alert('Parabéns! 🎉', 'Você completou mais uma atividade com sucesso!');
+  useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      return;
     }
 
-    if (selectedTask?.id === taskId) {
-      setSelectedTask(prev => prev ? { ...prev, completed: !isCompleted } : null);
+    const tasksRef = collection(db, 'users', userId, 'tasks');
+
+    // Escuta o banco de dados em tempo real. Se mudar na Web, muda no Mobile na hora!
+    const unsubscribe = onSnapshot(tasksRef, (snapshot) => {
+      const tasksList: Task[] = [];
+      snapshot.forEach((doc) => {
+        tasksList.push({ id: doc.id, ...doc.data() } as Task);
+      });
+      setTasks(tasksList);
+      setLoading(false);
+    }, (error) => {
+      console.error("Erro ao carregar tarefas no mobile:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [userId]);
+
+  const handleToggleTask = async (taskId: string, currentStatus: boolean) => {
+    if (!userId) return;
+
+    try {
+      const taskDocRef = doc(db, 'users', userId, 'tasks', taskId);
+      await updateDoc(taskDocRef, {
+        completed: !currentStatus
+      });
+      
+      if (!currentStatus) {
+        Alert.alert("Muito bem! 🎉", "Você concluiu mais uma atividade com sucesso!");
+      }
+    } catch (error) {
+      console.error("Erro ao alterar status da tarefa:", error);
+      Alert.alert("Ops!", "Não foi possível salvar o seu progresso. Verifique sua internet.");
     }
   };
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#2563eb" />
+        <Text style={{ fontSize: 20, marginTop: 10 }}>Buscando suas atividades...</Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.container }]}>
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
-
-        {activeCourseFilter && (
-          <View style={[styles.filterAlert, { backgroundColor: theme.card, borderColor: theme.borderColor }]}>
-            <Text style={[styles.filterText, { fontSize: getFontSize('body'), color: theme.text }]}>
-              Mostrando tarefas de: <Text style={{ fontWeight: '900' }}>{currentCourseName}</Text>
-            </Text>
-            <Pressable
-              onPress={onClearFilter}
-              style={[styles.clearFilterButton, { backgroundColor: theme.buttonClearBg, borderColor: theme.borderColor }]}
-            >
-              <Text style={[styles.clearFilterButtonText, { fontSize: getFontSize('body'), color: theme.buttonClearText }]}>
-                📂 Mostrar todas as tarefas
+    <View style={styles.container}>
+      <Text style={styles.headerTitle}>Minhas Atividades Acadêmicas</Text>
+      
+      {tasks.length === 0 ? (
+        <View style={styles.center}>
+          <Text style={{ fontSize: 18, textAlign: 'center' }}>Nenhuma tarefa encontrada para o seu curso.</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={tasks}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <View style={styles.taskCard}>
+              <Text style={[styles.taskTitle, item.completed && styles.completedText]}>
+                {item.title}
               </Text>
-            </Pressable>
-          </View>
-        )}
-
-        <Text style={[styles.sectionHeader, { fontSize: getFontSize('title'), color: theme.headerText }]}>
-          ⏳ Atividades para Fazer ({activeTasks.length})
-        </Text>
-
-        {activeTasks.length === 0 ? (
-          <Text style={[styles.emptyText, { fontSize: getFontSize('body'), color: theme.textMuted }]}>
-            Não há tarefas pendentes aqui! Excelente trabalho. 👍
-          </Text>
-        ) : (
-          activeTasks.map(task => (
-            <Pressable
-              key={task.id}
-              onPress={() => setSelectedTask(task)}
-              style={[styles.taskCard, { backgroundColor: theme.card, borderColor: theme.borderColor, padding: prefs.spacing === 'wide' ? 20 : 14 }]}
-            >
-              <View style={styles.taskCardHeader}>
-                <Text style={[styles.taskTitle, { fontSize: getFontSize('body') + 2, color: theme.text }]}>
-                  {task.title}
-                </Text>
-                {!activeCourseFilter && (
-                  <Text style={[styles.courseBadge, { fontSize: getFontSize('body') - 3, color: theme.textMuted }]}>
-                    {task.courseName}
-                  </Text>
-                )}
-              </View>
-              <Pressable
-                onPress={() => toggleTaskCompletion(task.id, task.completed)}
-                style={[styles.checkboxButton, { backgroundColor: theme.buttonClearBg, borderColor: theme.borderColor }]}
+              
+              <TouchableOpacity
+                style={[styles.button, item.completed ? styles.btnCompleted : styles.btnPending]}
+                onPress={() => handleToggleTask(item.id, item.completed)}
               >
-                <Text style={{ fontSize: getFontSize('body') }}>⬜ Marcar como Feita</Text>
-              </Pressable>
-            </Pressable>
-          ))
-        )}
-
-        <Text style={[styles.sectionHeader, { fontSize: getFontSize('title'), color: theme.headerText, marginTop: 16 }]}>
-          ✅ Concluídas ({finishedTasks.length})
-        </Text>
-
-        {finishedTasks.map(task => (
-          <Pressable
-            key={task.id}
-            onPress={() => setSelectedTask(task)}
-            style={[styles.taskCard, { backgroundColor: theme.card, borderColor: theme.borderColor, opacity: 0.8, padding: prefs.spacing === 'wide' ? 20 : 14 }]}
-          >
-            <View style={styles.taskCardHeader}>
-              <Text style={[styles.taskTitle, { fontSize: getFontSize('body') + 2, color: theme.text, textDecorationLine: 'line-through' }]}>
-                {task.title}
-              </Text>
+                <Text style={styles.btnText}>
+                  {item.completed ? "✓ Concluído" : "Marcar como Pronto"}
+                </Text>
+              </TouchableOpacity>
             </View>
-            <Pressable
-              onPress={() => toggleTaskCompletion(task.id, task.completed)}
-              style={[styles.checkboxButton, { backgroundColor: theme.buttonActiveBg, borderColor: theme.borderColor }]}
-            >
-              <Text style={{ fontSize: getFontSize('body'), color: theme.buttonActiveText, fontWeight: 'bold' }}>
-                💚 Atividade Concluída! (Refazer)
-              </Text>
-            </Pressable>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      {selectedTask && (
-        <View style={[StyleSheet.absoluteFill, styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]}> <View style={[styles.modalContent, { backgroundColor: theme.card, borderColor: theme.borderColor, padding: prefs.spacing === 'wide' ? 28 : 20 }]}>
-          <Text style={[styles.modalCourse, { fontSize: getFontSize('body') - 2, color: theme.textMuted }]}>
-            {selectedTask.courseName}
-          </Text>
-          <Text style={[styles.modalTitle, { fontSize: getFontSize('title'), color: theme.text }]}>
-            {selectedTask.title}
-          </Text>
-
-          <ScrollView style={styles.modalDescriptionContainer}>
-            <Text style={[styles.modalDescription, { fontSize: getFontSize('body') + 2, color: theme.text }]}>
-              {selectedTask.description}
-            </Text>
-          </ScrollView>
-
-          <View style={{ gap: 12, marginTop: 16 }}>
-            <Pressable
-              onPress={() => toggleTaskCompletion(selectedTask.id, selectedTask.completed)}
-              style={[styles.modalActionButton, { backgroundColor: selectedTask.completed ? theme.buttonClearBg : theme.buttonActiveBg }]}
-            >
-              <Text style={{ fontSize: getFontSize('body'), fontWeight: 'bold', color: selectedTask.completed ? theme.buttonClearText : theme.buttonActiveText, textAlign: 'center' }}>
-                {selectedTask.completed ? '↩️ Mudar para Não Feita' : '✔️ Concluir esta Atividade'}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => setSelectedTask(null)}
-              style={[styles.modalCloseButton, { borderColor: theme.borderColor }]}
-            >
-              <Text style={{ fontSize: getFontSize('body'), color: theme.text, textAlign: 'center', fontWeight: 'bold' }}>
-                Fechar Detalhes
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-        </View>
+          )}
+        />
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  filterAlert: { borderRadius: 16, borderWidth: 3, padding: 16, gap: 12, elevation: 2 },
-  filterText: { lineHeight: 26 },
-  clearFilterButton: { padding: 12, borderRadius: 10, borderWidth: 2, alignItems: 'center' },
-  clearFilterButtonText: { fontWeight: 'bold' },
-  sectionHeader: { fontWeight: '900', marginVertical: 6 },
-  emptyText: { fontStyle: 'italic', paddingLeft: 4 },
-  taskCard: { borderRadius: 16, borderWidth: 3, gap: 12, elevation: 1 },
-  taskCardHeader: { gap: 4 },
-  taskTitle: { fontWeight: 'bold', lineHeight: 26 },
-  courseBadge: { fontWeight: 'bold' },
-  checkboxButton: { padding: 12, borderRadius: 10, borderWidth: 2, alignItems: 'center' },
-  modalOverlay: { justifyContent: 'center', alignItems: 'center', padding: 16 },
-  modalContent: { width: '100%', maxHeight: '80%', borderRadius: 24, borderWidth: 4, gap: 14, elevation: 10 },
-  modalCourse: { fontWeight: 'bold', textTransform: 'uppercase' },
-  modalTitle: { fontWeight: '900', lineHeight: 32 },
-  modalDescriptionContainer: { maxHeight: 180, marginVertical: 6 },
-  modalDescription: { lineHeight: 28 },
-  modalActionButton: { padding: 16, borderRadius: 12, justifyContent: 'center' },
-  modalCloseButton: { padding: 14, borderRadius: 12, borderWidth: 2, justifyContent: 'center' }
+  container: { flex: 1, padding: 16, backgroundColor: '#f8fafc' },
+  headerTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 16, textAlign: 'center', color: '#1e293b' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  taskCard: {
+    padding: 20,
+    marginVertical: 8,
+    borderWidth: 2,
+    borderColor: '#cbd5e1',
+    borderRadius: 16,
+    backgroundColor: '#ffffff',
+    elevation: 2
+  },
+  taskTitle: { fontSize: 20, marginBottom: 16, color: '#1e293b', fontWeight: '500', lineHeight: 28 },
+  completedText: { textDecorationLine: 'line-through', color: '#64748b', opacity: 0.7 },
+  button: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52 
+  },
+  btnPending: { backgroundColor: '#2563eb' },
+  btnCompleted: { backgroundColor: '#16a34a' },
+  btnText: { color: '#ffffff', fontSize: 18, fontWeight: 'bold' }
 });

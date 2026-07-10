@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import AccessibilityPanel, { AccessibilityPreferences } from '../components/AccessibilityPanel';
+import {AccessibilityPanel, AccessibilityPreferences } from '../components/AccessibilityPanel';
 
 interface WelcomeScreenProps {
   navigation: any; // Ajuste para a tipagem do seu Navigator (Stack ou Router)
