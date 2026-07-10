@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth, db } from '../lib/firebase';
+import { auth } from '../lib/firebase';
+import { getFirestore } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
-// 🌟 O IMPORT DO SEU PACOTE ENTRA AQUI TAMBÉM:
-import { AccessibilityPreferences } from '@seniorease/domain';
+import type { AccessibilityPreferences } from '@seniorease/domain';
 
 interface AccessibilityContextType {
   prefs: AccessibilityPreferences;
@@ -31,7 +31,8 @@ export function AccessibilityProvider({ children }: { children: React.ReactNode 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         try {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          const firestore = getFirestore();
+          const userDoc = await getDoc(doc(firestore, 'users', user.uid));
           if (userDoc.exists()) {
             const data = userDoc.data();
             setUserName(data.displayName || user.email?.split('@')[0] || 'Estudante');
@@ -53,7 +54,8 @@ export function AccessibilityProvider({ children }: { children: React.ReactNode 
     setPrefs(newPrefs);
     const user = auth.currentUser;
     if (user) {
-      await updateDoc(doc(db, 'users', user.uid), { preferences: newPrefs });
+      const firestore = getFirestore();
+      await updateDoc(doc(firestore, 'users', user.uid), { preferences: newPrefs });
     }
   };
 

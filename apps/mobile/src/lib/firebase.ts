@@ -1,15 +1,13 @@
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import {
+  initializeAuth,
+  getReactNativePersistence,
+  browserLocalPersistence,
+} from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-// IMPORTAÇÃO UNIFICADA: Tudo direto do pacote principal 'firebase/auth'
-import { 
-  initializeAuth, 
-  browserLocalPersistence, 
-  getReactNativePersistence 
-} from 'firebase/auth';
-
+// Suas credenciais do Firebase (carregadas automaticamente pelo Expo através do .env)
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -19,13 +17,15 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
-const app = initializeApp(firebaseConfig);
+// Inicializa o App prevenindo duplicidade no Fast Refresh
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// O Metro não vai mais se perder porque o caminho agora é 100% padrão
-const persistence = Platform.OS === 'web'
-  ? browserLocalPersistence
-  : getReactNativePersistence(AsyncStorage);
+// Persistência: AsyncStorage em nativo, localStorage do navegador na web
+const auth = initializeAuth(app, {
+  persistence:
+    Platform.OS === 'web'
+      ? browserLocalPersistence
+      : getReactNativePersistence(AsyncStorage),
+});
 
-export const auth = initializeAuth(app, { persistence });
-export const db = getFirestore(app);
-export default app;
+export { app, auth };

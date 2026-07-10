@@ -1,11 +1,18 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { AccessibilityPreferences } from '../context/AccessibilityContext';
 import { AccessibleButton } from './AccessibleButton';
 
-interface AccessibilityPanelProps {
+export interface AccessibilityPreferences {
+  fontSize: 'normal' | 'large' | 'extra-large';
+  spacing: 'normal' | 'wide';
+  highContrast: boolean;
+  extraConfirmation?: boolean;
+  simplifiedMode?: boolean;
+}
+
+export interface AccessibilityPanelProps {
   prefs: AccessibilityPreferences;
-  onChange: (updatedPrefs: AccessibilityPreferences) => void;
+  onChange: (prefs: AccessibilityPreferences) => void;
 }
 
 export function AccessibilityPanel({ prefs, onChange }: AccessibilityPanelProps) {
