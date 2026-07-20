@@ -1,93 +1,125 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { db, auth } from '../lib/firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { useAccessibility } from '../context/AccessibilityContext';
+import { CalculateProgress } from '@seniorease/domain';
+import { Header } from '../components/Header'; 
 
-const COURSES_SUMMARY = [
-  { id: 'curso-ti', title: '💻 Introdução ao Celular e Internet', progress: 50, totalTasks: 2, completedTasks: 1 },
-  { id: 'curso-financas', title: '💰 Finanças Pessoais Práticas', progress: 0, totalTasks: 1, completedTasks: 0 }
-];
+export default function DashboardScreen() {
+  const { prefs } = useAccessibility();
+  const [progress, setProgress] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const userId = auth.currentUser?.uid;
 
-interface DashboardScreenProps {
-  onSelectCourse: (courseId: string) => void;
-}
-
-export default function DashboardScreen({ onSelectCourse }: DashboardScreenProps) {
-  const { prefs, userName } = useAccessibility();
-
-  const getFontSize = (type: 'title' | 'body') => {
-    const isLarge = prefs.fontSize === 'large';
-    const isExtra = prefs.fontSize === 'extra-large';
-    return type === 'title' ? (isExtra ? 28 : isLarge ? 24 : 20) : (isExtra ? 20 : isLarge ? 18 : 15);
+  const getFontSize = (type: 'title' | 'body' | 'percentage') => {
+    const modifier = prefs.fontSize === 'extra-large' ? 6 : prefs.fontSize === 'large' ? 3 : 0;
+    if (type === 'percentage') return 36 + modifier;
+    if (type === 'title') return 22 + modifier;
+    return 18 + modifier;
   };
 
   const theme = {
-    container: prefs.highContrast ? '#000000' : '#f8fafc',
+    bg: prefs.highContrast ? '#000000' : '#f8fafc',
     card: prefs.highContrast ? '#121212' : '#ffffff',
-    borderColor: prefs.highContrast ? '#facc15' : '#e2e8f0',
-    text: prefs.highContrast ? '#facc15' : '#1e293b',
-    textMuted: prefs.highContrast ? '#eab308' : '#64748b',
-    headerBg: prefs.highContrast ? '#000000' : '#ffffff',
-    progressBarBg: prefs.highContrast ? '#333333' : '#e2e8f0',
-    progressBarFill: prefs.highContrast ? '#16a34a' : '#22c55e',
+    text: prefs.highContrast ? '#ffff00' : '#1e293b',
+    textMuted: prefs.highContrast ? '#ffffff' : '#64748b',
+    border: prefs.highContrast ? '#ffff00' : '#cbd5e1',
+    progressBg: prefs.highContrast ? '#1c1c1c' : '#e2e8f0',
+    progressFill: prefs.highContrast ? '#ffff00' : '#16a34a',
   };
 
+  useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
+    const tasksRef = collection(db, 'users', userId, 'tasks');
+    
+    const unsubscribe = onSnapshot(tasksRef, (snapshot) => {
+      const tasksList: { completed: boolean }[] = [];
+      snapshot.forEach((doc) => {
+        tasksList.push({ completed: doc.data().completed || false });
+      });
+
+      const computedProgress = CalculateProgress.execute(tasksList);
+      setProgress(computedProgress);
+      setLoading(false);
+    }, (error) => {
+      console.error("Erro ao computar progresso no dashboard:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [userId]);
+
+  if (loading) {
+    return (
+      <View style={[styles.center, { backgroundColor: theme.bg }]}>
+        <ActivityIndicator size="large" color={prefs.highContrast ? '#ffff00' : '#2563eb'} />
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.container }]}>
-      <View style={[styles.header, { backgroundColor: theme.headerBg, borderBottomColor: theme.borderColor }]}>
-        <Text style={[styles.title, { fontSize: getFontSize('title') + 4, color: theme.text }]}>
-          Seu Progresso 🎓
-        </Text>
-        <Text style={{ fontSize: getFontSize('body'), color: theme.textMuted, marginTop: 6, lineHeight: 24 }}>
-          Olá, {userName}! Toque em qualquer curso abaixo para ver e fazer suas atividades.
-        </Text>
-      </View>
+    <View style={{ flex: 1, backgroundColor: theme.bg }}>
+      {/* 🌟 O Header isolado e reutilizável aplicado lindamente aqui */}
+      <Header title="Minhas Atividades 🌟" />
 
-      <View style={{ gap: prefs.spacing === 'wide' ? 24 : 14, padding: 16 }}>
-        {COURSES_SUMMARY.map((course) => (
-          /* 🌟 MUTADO PARA PRESSABLE: Ao tocar, ele chama a função de redirecionamento */
-          <Pressable 
-            key={course.id} 
-            onPress={() => onSelectCourse(course.id)}
-            style={({ pressed }) => [
-              styles.card, 
-              { 
-                backgroundColor: theme.card, 
-                borderColor: theme.borderColor, 
-                padding: prefs.spacing === 'wide' ? 24 : 16,
-                opacity: pressed ? 0.8 : 1
-              }
-            ]}
-          >
-            <Text style={[styles.cardTitle, { fontSize: getFontSize('title'), color: theme.text }]}>
-              {course.title}
-            </Text>
+      <ScrollView contentContainerStyle={[styles.container, { padding: prefs.spacing === 'wide' ? 24 : 16 }]}>
+        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, gap: prefs.spacing === 'wide' ? 20 : 12 }]}>
+          
+          <Text style={[styles.title, { color: theme.text, fontSize: getFontSize('title') }]}>
+            Seu Progresso de Hoje 🚀
+          </Text>
+          
+          <Text style={[styles.percentageText, { color: prefs.highContrast ? '#ffff00' : '#2563eb', fontSize: getFontSize('percentage') }]}>
+            {progress}% Concluído
+          </Text>
+          
+          <View style={[styles.progressBarBackground, { backgroundColor: theme.progressBg }]}>
+            <View style={[styles.progressBarFill, { width: `${progress}%`, backgroundColor: theme.progressFill }]} />
+          </View>
 
-            <View style={styles.progressContainer}>
-              <View style={[styles.progressBarOuter, { backgroundColor: theme.progressBarBg }]}>
-                <View style={[styles.progressBarInner, { width: `${course.progress}%`, backgroundColor: theme.progressBarFill }]} />
-              </View>
-              <Text style={[styles.progressText, { fontSize: getFontSize('body') - 2, color: theme.text, fontWeight: 'bold' }]}>
-                {course.progress}% Concluído ({course.completedTasks}/{course.totalTasks})
-              </Text>
-              <Text style={{ color: theme.textMuted, fontSize: getFontSize('body') - 2, marginTop: 4, fontStyle: 'italic' }}>
-                Clique para abrir as tarefas de hoje ➔
-              </Text>
-            </View>
-          </Pressable>
-        ))}
-      </View>
-    </ScrollView>
+          <Text style={[styles.motivationalText, { color: theme.textMuted, fontSize: getFontSize('body'), lineHeight: prefs.spacing === 'wide' ? 30 : 24 }]}>
+            {progress === 100 
+              ? "Parabéns! Você completou todas as atividades de hoje! 🎉" 
+              : "Continue assim! Cada pequeno passo conta na nossa jornada digital. 🧑‍💻"}
+          </Text>
+
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { padding: 20, borderBottomWidth: 2 },
-  title: { fontWeight: '900' },
-  card: { borderRadius: 16, borderWidth: 3, gap: 12, elevation: 1 },
-  cardTitle: { fontWeight: 'bold' },
-  progressContainer: { marginTop: 4, gap: 6 },
-  progressBarOuter: { height: 16, borderRadius: 8, overflow: 'hidden', width: '100%' },
-  progressBarInner: { height: '100%' },
-  progressText: { marginTop: 2 }
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  container: { flexGrow: 1, justifyContent: 'center' },
+  card: {
+    padding: 24,
+    borderRadius: 24,
+    borderWidth: 3,
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  title: { fontWeight: 'bold', textAlign: 'center' },
+  percentageText: { fontWeight: '900', marginVertical: 4 },
+  progressBarBackground: {
+    width: '100%',
+    height: 28,
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginVertical: 10,
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 14,
+  },
+  motivationalText: { textAlign: 'center', fontWeight: '500' }
 });

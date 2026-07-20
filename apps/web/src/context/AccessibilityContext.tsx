@@ -1,68 +1,82 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth, db } from '../lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 
-import { AccessibilityPreferences } from '@seniorease/domain'; 
-
-export interface AccessibilityContextType {
-  prefs: {
-    fontSize: 'normal' | 'large' | 'extra-large';
-    spacing: 'normal' | 'wide';
-    highContrast: boolean;
-  };
-  // optional setter when direct state update is needed
-  setPrefs?: React.Dispatch<React.SetStateAction<{
-    fontSize: 'normal' | 'large' | 'extra-large';
-    spacing: 'normal' | 'wide';
-    highContrast: boolean;
-  }>>;
-  // function to persist and apply preferences
-  updatePrefs: (newPrefs: AccessibilityPreferences) => Promise<void>;
-  loading: boolean;
-  userName?: string;
+export interface AccessibilityPreferences {
+  fontSize: 'normal' | 'large' | 'extra-large';
+  highContrast: boolean;
+  spacing: 'normal' | 'wide';
+  simplifiedMode: boolean;
+  extraConfirmation: boolean;
 }
+
+interface AccessibilityContextType {
+  prefs: AccessibilityPreferences;
+  userName: string;
+  updatePrefs: (newPrefs: Partial<AccessibilityPreferences>) => Promise<void>;
+  loading: boolean;
+}
+
+const defaultPrefs: AccessibilityPreferences = {
+  fontSize: 'normal',
+  highContrast: false,
+  spacing: 'normal',
+  simplifiedMode: false,
+  extraConfirmation: true,
+};
 
 const AccessibilityContext = createContext<AccessibilityContextType | undefined>(undefined);
 
 export function AccessibilityProvider({ children }: { children: React.ReactNode }) {
+  const [prefs, setPrefs] = useState<AccessibilityPreferences>(defaultPrefs);
   const [userName, setUserName] = useState('');
   const [loading, setLoading] = useState(true);
-  const [prefs, setPrefs] = useState<AccessibilityPreferences>({
-    fontSize: 'normal',
-    highContrast: false,
-    spacing: 'normal',
-    simplifiedMode: false,
-    extraConfirmation: false,
-    reminderFrequency: 'none',
-  });
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (user) {
-        try {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          if (userDoc.exists()) {
-            const data = userDoc.data();
-            setUserName(data.displayName || user.email?.split('@')[0] || 'Estudante');
-            if (data.preferences) setPrefs(data.preferences);
+        // Escuta o Firestore em tempo real. Se o idoso mudar a letra no Mobile, muda na Web na hora!
+        const userRef = doc(db, 'users', user.uid);
+        const unsubscribeSnapshot = onSnapshot(userRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setUserName(data.name || 'Estudante');
+            if (data.preferences) {
+              setPrefs(data.preferences);
+            }
           }
-        } catch (e) {
-          console.error(e);
-        }
+          setLoading(false);
+        }, (error) => {
+          console.error("Erro ao escutar preferências:", error);
+          setLoading(false);
+        });
+
+        return () => unsubscribeSnapshot();
+      } else {
+        setPrefs(defaultPrefs);
+        setUserName('');
+        setLoading(false);
       }
-      setLoading(false);
     });
-    return () => unsubscribe();
+
+    return () => unsubscribeAuth();
   }, []);
 
-  const updatePrefs = async (newPrefs: AccessibilityPreferences) => {
-    setPrefs(newPrefs);
+  const updatePrefs = async (newPrefs: Partial<AccessibilityPreferences>) => {
+    const updated = { ...prefs, ...newPrefs };
+    setPrefs(updated);
+    
     const user = auth.currentUser;
     if (user) {
-      await updateDoc(doc(db, 'users', user.uid), { preferences: newPrefs });
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        await updateDoc(userRef, { preferences: updated });
+      } catch (error) {
+        console.error("Erro ao salvar preferências no Firestore:", error);
+      }
     }
   };
 
@@ -75,6 +89,8 @@ export function AccessibilityProvider({ children }: { children: React.ReactNode 
 
 export function useAccessibility() {
   const context = useContext(AccessibilityContext);
-  if (!context) throw new Error('useAccessibility deve ser usado dentro de um AccessibilityProvider');
+  if (!context) {
+    throw new Error('useAccessibility deve ser usado dentro de um AccessibilityProvider');
+  }
   return context;
 }

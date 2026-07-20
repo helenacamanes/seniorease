@@ -1,61 +1,79 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth } from '../lib/firebase';
-import { getFirestore } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 
-import type { AccessibilityPreferences } from '@seniorease/domain';
+export interface AccessibilityPreferences {
+  fontSize: 'normal' | 'large' | 'extra-large';
+  highContrast: boolean;
+  spacing: 'normal' | 'wide';
+  simplifiedMode: boolean;
+  extraConfirmation: boolean;
+}
 
 interface AccessibilityContextType {
   prefs: AccessibilityPreferences;
   userName: string;
-  updatePrefs: (newPrefs: AccessibilityPreferences) => Promise<void>;
+  updatePrefs: (newPrefs: Partial<AccessibilityPreferences>) => Promise<void>;
   loading: boolean;
 }
+
+const defaultPrefs: AccessibilityPreferences = {
+  fontSize: 'normal',
+  highContrast: false,
+  spacing: 'normal',
+  simplifiedMode: false,
+  extraConfirmation: true,
+};
 
 const AccessibilityContext = createContext<AccessibilityContextType | undefined>(undefined);
 
 export function AccessibilityProvider({ children }: { children: React.ReactNode }) {
+  const [prefs, setPrefs] = useState<AccessibilityPreferences>(defaultPrefs);
   const [userName, setUserName] = useState('');
   const [loading, setLoading] = useState(true);
-  const [prefs, setPrefs] = useState<AccessibilityPreferences>({
-    fontSize: 'normal',
-    highContrast: false,
-    spacing: 'normal',
-    simplifiedMode: false,
-    extraConfirmation: false,
-    reminderFrequency: 'none',
-  });
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (user) {
-        try {
-          const firestore = getFirestore();
-          const userDoc = await getDoc(doc(firestore, 'users', user.uid));
-          if (userDoc.exists()) {
-            const data = userDoc.data();
-            setUserName(data.displayName || user.email?.split('@')[0] || 'Estudante');
-            if (data.preferences) setPrefs(data.preferences);
-          } else {
-            setUserName(user.email?.split('@')[0] || 'Estudante');
+        const userRef = doc(db, 'users', user.uid);
+        const unsubscribeSnapshot = onSnapshot(userRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setUserName(data.name || 'Estudante');
+            if (data.preferences) {
+              setPrefs(data.preferences);
+            }
           }
-        } catch (e) {
-          console.error('Erro ao buscar preferências, prosseguindo com padrão:', e);
-          setUserName(user.email?.split('@')[0] || 'Estudante');
-        }
+          setLoading(false);
+        }, (error) => {
+          console.error("Erro ao sincronizar Firestore Mobile:", error);
+          setLoading(false);
+        });
+
+        return () => unsubscribeSnapshot();
+      } else {
+        setPrefs(defaultPrefs);
+        setUserName('');
+        setLoading(false);
       }
-      setLoading(false);
     });
-    return () => unsubscribe();
+
+    return () => unsubscribeAuth();
   }, []);
 
-  const updatePrefs = async (newPrefs: AccessibilityPreferences) => {
-    setPrefs(newPrefs);
+  const updatePrefs = async (newPrefs: Partial<AccessibilityPreferences>) => {
+    const updated = { ...prefs, ...newPrefs };
+    setPrefs(updated);
+
     const user = auth.currentUser;
     if (user) {
-      const firestore = getFirestore();
-      await updateDoc(doc(firestore, 'users', user.uid), { preferences: newPrefs });
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        await updateDoc(userRef, { preferences: updated });
+      } catch (error) {
+        console.error("Erro ao atualizar Firestore Mobile:", error);
+      }
     }
   };
 
@@ -68,6 +86,8 @@ export function AccessibilityProvider({ children }: { children: React.ReactNode 
 
 export function useAccessibility() {
   const context = useContext(AccessibilityContext);
-  if (!context) throw new Error('useAccessibility deve ser usado dentro de um AccessibilityProvider');
+  if (!context) {
+    throw new Error('useAccessibility deve ser usado dentro de um AccessibilityProvider');
+  }
   return context;
 }
