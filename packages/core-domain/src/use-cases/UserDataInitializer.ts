@@ -1,11 +1,25 @@
 import { doc, setDoc, collection, getDoc } from 'firebase/firestore';
+import { AccessibilityPreferences } from '../accessibility/preferences';
+
+const DEFAULT_PREFERENCES: AccessibilityPreferences = {
+  fontSize: 'normal',
+  highContrast: false,
+  spacing: 'normal',
+  simplifiedMode: false,
+  extraConfirmation: true,
+  reminderFrequency: 'none',
+};
 
 export const inicializarPerfilE_Tarefas = async (
-  db: any, 
-  uid: string, 
-  name: string, 
-  email: string, 
-  cursoId: string
+  db: any,
+  uid: string,
+  name: string,
+  email: string,
+  cursoId: string,
+  // 🌟 Preferências que o usuário já escolheu ANTES de criar a conta
+  // (na tela de boas-vindas / preferências). Se nada for passado,
+  // caímos no padrão de sempre.
+  initialPrefs?: Partial<AccessibilityPreferences>
 ) => {
   try {
     const courseDocRef = doc(db, 'courses', cursoId);
@@ -24,6 +38,11 @@ export const inicializarPerfilE_Tarefas = async (
       ];
     }
 
+    const finalPreferences: AccessibilityPreferences = {
+      ...DEFAULT_PREFERENCES,
+      ...initialPrefs,
+    };
+
     const userRef = doc(db, 'users', uid);
     await setDoc(userRef, {
       name: name || 'Estudante Conectado',
@@ -31,13 +50,7 @@ export const inicializarPerfilE_Tarefas = async (
       selectedCourse: nomeAmigavelCurso,
       courseId: cursoId,
       createdAt: new Date(),
-      preferences: {
-        fontSize: 'normal',
-        highContrast: false,
-        spacing: 'normal',
-        simplifiedMode: false,
-        extraConfirmation: true
-      }
+      preferences: finalPreferences,
     });
 
     const userTasksCollectionRef = collection(db, 'users', uid, 'tasks');
@@ -46,7 +59,10 @@ export const inicializarPerfilE_Tarefas = async (
       await setDoc(novaTarefaRef, {
         title: tarefa.title,
         category: tarefa.category,
-        completed: false
+        completed: false,
+        // 🌟 Necessário para o Web conseguir agrupar/filtrar tarefas por curso
+        courseId: cursoId,
+        courseName: nomeAmigavelCurso,
       });
     }
   } catch (error) {

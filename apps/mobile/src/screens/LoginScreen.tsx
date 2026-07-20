@@ -61,7 +61,9 @@ export function LoginScreen({ onAuthSuccess }: LoginScreenProps) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         
         // 🌟 INVERSÃO DE DEPENDÊNCIA APLICADA NO MOBILE: Injeta o 'db' do Mobile
-        await inicializarPerfilE_Tarefas(db, userCredential.user.uid, name, email, selectedCourse);
+        // 🌟 Envia também as preferências (fonte/contraste/espaçamento) que o
+        // usuário já ajustou na tela de boas-vindas, para não serem perdidas.
+        await inicializarPerfilE_Tarefas(db, userCredential.user.uid, name, email, selectedCourse, prefs);
         
         Alert.alert("Sucesso!", "Sua conta foi criada e suas atividades foram configuradas com sucesso.");
       } else {
