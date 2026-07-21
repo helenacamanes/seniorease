@@ -1,14 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAccessibility } from '../context/AccessibilityContext';
 import WebDashboard from './WebDashboard';
 import WebTasks from './WebTasks';
+import WebHistory from './WebHistory';
 import WebSettings from './WebSettings';
+
+type TabKey = 'courses' | 'tasks' | 'history' | 'settings';
 
 export default function MainLayout() {
   const { prefs } = useAccessibility();
-  const [currentTab, setCurrentTab] = useState<'courses' | 'tasks' | 'settings'>('courses');
+  const [currentTab, setCurrentTab] = useState<TabKey>('courses');
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
 
   // Paleta adaptável baseada nas preferências de acessibilidade
@@ -32,27 +35,53 @@ export default function MainLayout() {
     return '16px';
   };
 
+  // 🌟 MODO SIMPLIFICADO: menos itens no menu, para reduzir a quantidade de
+  // escolhas e complexidade visual. "Cursos" (dashboard de progresso) some
+  // e o app abre direto nas Tarefas, que é a ação mais usada no dia a dia.
+  const navItems: { key: TabKey; icon: string; label: string }[] = prefs.simplifiedMode
+    ? [
+        { key: 'tasks', icon: '📋', label: 'Minhas Tarefas' },
+        { key: 'history', icon: '🗂️', label: 'Histórico' },
+        { key: 'settings', icon: '⚙️', label: 'Ajustes' },
+      ]
+    : [
+        { key: 'courses', icon: '🎓', label: 'Cursos' },
+        { key: 'tasks', icon: '📋', label: 'Minhas Tarefas' },
+        { key: 'history', icon: '🗂️', label: 'Histórico' },
+        { key: 'settings', icon: '⚙️', label: 'Ajustes' },
+      ];
+
+  // Se ligar o Modo Simplificado enquanto está na aba "Cursos" (que some),
+  // voltamos para "Tarefas" para a tela não ficar em branco.
+  useEffect(() => {
+    if (prefs.simplifiedMode && currentTab === 'courses') {
+      setCurrentTab('tasks');
+    }
+  }, [prefs.simplifiedMode, currentTab]);
+
   const renderContent = () => {
     switch (currentTab) {
       case 'courses':
         return <WebDashboard onSelectCourse={handleSelectCourse} />;
       case 'tasks':
         return (
-          <WebTasks 
-            activeCourseFilter={selectedCourseId} 
-            onClearFilter={() => setSelectedCourseId(null)} 
+          <WebTasks
+            activeCourseFilter={selectedCourseId}
+            onClearFilter={() => setSelectedCourseId(null)}
           />
         );
+      case 'history':
+        return <WebHistory />;
       case 'settings':
         return <WebSettings />;
       default:
-        return <WebDashboard onSelectCourse={handleSelectCourse} />;
+        return <WebTasks activeCourseFilter={null} onClearFilter={() => {}} />;
     }
   };
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: theme.bg, fontFamily: 'sans-serif' }}>
-      
+
       {/* 🧭 BARRA LATERAL ACESSÍVEL (Único local de navegação e ajustes agora) */}
       <nav style={{
         width: prefs.spacing === 'wide' ? '320px' : '260px',
@@ -67,44 +96,26 @@ export default function MainLayout() {
           Plataforma Digital 🎓
         </div>
 
-        <button
-          onClick={() => { setSelectedCourseId(null); setCurrentTab('courses'); }}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '14px', width: '100%', padding: '16px', 
-            border: `2px solid ${currentTab === 'courses' ? theme.borderColor : 'transparent'}`,
-            borderRadius: '12px', cursor: 'pointer', textAlign: 'left', fontWeight: 'bold', fontSize: getFontSize(),
-            backgroundColor: currentTab === 'courses' ? theme.activeBg : 'transparent', color: theme.text
-          }}
-        >
-          <span style={{ fontSize: '28px' }}>🎓</span> Cursos
-        </button>
-
-        <button
-          onClick={() => setCurrentTab('tasks')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '14px', width: '100%', padding: '16px', 
-            border: `2px solid ${currentTab === 'tasks' ? theme.borderColor : 'transparent'}`,
-            borderRadius: '12px', cursor: 'pointer', textAlign: 'left', fontWeight: 'bold', fontSize: getFontSize(),
-            backgroundColor: currentTab === 'tasks' ? theme.activeBg : 'transparent', color: theme.text
-          }}
-        >
-          <span style={{ fontSize: '28px' }}>📋</span> Minhas Tarefas
-        </button>
-
-        <button
-          onClick={() => setCurrentTab('settings')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '14px', width: '100%', padding: '16px', 
-            border: `2px solid ${currentTab === 'settings' ? theme.borderColor : 'transparent'}`,
-            borderRadius: '12px', cursor: 'pointer', textAlign: 'left', fontWeight: 'bold', fontSize: getFontSize(),
-            backgroundColor: currentTab === 'settings' ? theme.activeBg : 'transparent', color: theme.text
-          }}
-        >
-          <span style={{ fontSize: '28px' }}>⚙️</span> Ajustes
-        </button>
+        {navItems.map((item) => (
+          <button
+            key={item.key}
+            onClick={() => {
+              if (item.key === 'courses') setSelectedCourseId(null);
+              setCurrentTab(item.key);
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '14px', width: '100%', padding: '16px',
+              border: `2px solid ${currentTab === item.key ? theme.borderColor : 'transparent'}`,
+              borderRadius: '12px', cursor: 'pointer', textAlign: 'left', fontWeight: 'bold', fontSize: getFontSize(),
+              backgroundColor: currentTab === item.key ? theme.activeBg : 'transparent', color: theme.text
+            }}
+          >
+            <span style={{ fontSize: '28px' }}>{item.icon}</span> {item.label}
+          </button>
+        ))}
       </nav>
 
-      {/* 💻 CONTEÚDO PRINCIPAL (Sem o painel/botão "Ajustar Tela" superior) */}
+      {/* 💻 CONTEÚDO PRINCIPAL */}
       <main style={{ flex: 1, padding: '40px', overflowY: 'auto' }}>
         {renderContent()}
       </main>

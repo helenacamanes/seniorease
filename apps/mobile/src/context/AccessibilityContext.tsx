@@ -9,6 +9,8 @@ export interface AccessibilityPreferences {
   spacing: 'normal' | 'wide';
   simplifiedMode: boolean;
   extraConfirmation: boolean;
+  reminderFrequency: 'none' | 'daily' | 'weekly';
+  enhancedFeedback: boolean;
 }
 
 interface AccessibilityContextType {
@@ -24,6 +26,8 @@ const defaultPrefs: AccessibilityPreferences = {
   spacing: 'normal',
   simplifiedMode: false,
   extraConfirmation: true,
+  reminderFrequency: 'none',
+  enhancedFeedback: true,
 };
 
 const AccessibilityContext = createContext<AccessibilityContextType | undefined>(undefined);

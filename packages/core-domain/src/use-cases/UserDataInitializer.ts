@@ -8,6 +8,7 @@ const DEFAULT_PREFERENCES: AccessibilityPreferences = {
   simplifiedMode: false,
   extraConfirmation: true,
   reminderFrequency: 'none',
+  enhancedFeedback: true,
 };
 
 export const inicializarPerfilE_Tarefas = async (

@@ -2,15 +2,15 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useAccessibility } from '../context/AccessibilityContext';
 import TasksScreen from '../screens/TasksScreen';
-import DashboardScreen from '../screens/DashboardScreen'; 
-import AccessibilityPanelScreen from '../screens/AccessibilityPanelScreen'; 
+import DashboardScreen from '../screens/DashboardScreen';
+import HistoryScreen from '../screens/HistoryScreen';
+import AccessibilityPanelScreen from '../screens/AccessibilityPanelScreen';
+
+type TabKey = 'courses' | 'tasks' | 'history' | 'settings';
 
 export default function MainTabNavigator() {
   const { prefs } = useAccessibility();
-  const [currentTab, setCurrentTab] = useState<'courses' | 'tasks' | 'settings'>('courses');
-  
-  // 🌟 NOVO: Estado para saber se há um curso filtrado vindo da Dashboard
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [currentTab, setCurrentTab] = useState<TabKey>('tasks');
 
   const getTabFontSize = () => {
     if (prefs.fontSize === 'extra-large') return 18;
@@ -26,27 +26,42 @@ export default function MainTabNavigator() {
     activeBg: prefs.highContrast ? '#222222' : '#f1f5f9',
   };
 
-  // Função para a Dashboard chamar ao clicar em um curso
-  const handleSelectCourse = (courseId: string) => {
-    setSelectedCourseId(courseId); // Define o filtro do curso
-    setCurrentTab('tasks');        // Chaveia automaticamente para a aba de tarefas
-  };
+  // 🌟 MODO SIMPLIFICADO: menos abas na tela, para reduzir a quantidade de
+  // escolhas e complexidade visual. "Cursos" (dashboard de progresso) some
+  // e o app abre direto nas Tarefas, que é a ação mais usada no dia a dia.
+  const tabs: { key: TabKey; icon: string; label: string }[] = prefs.simplifiedMode
+    ? [
+        { key: 'tasks', icon: '📋', label: 'Tarefas' },
+        { key: 'history', icon: '🗂️', label: 'Histórico' },
+        { key: 'settings', icon: '⚙️', label: 'Ajustes' },
+      ]
+    : [
+        { key: 'courses', icon: '🎓', label: 'Cursos' },
+        { key: 'tasks', icon: '📋', label: 'Tarefas' },
+        { key: 'history', icon: '🗂️', label: 'Histórico' },
+        { key: 'settings', icon: '⚙️', label: 'Ajustes' },
+      ];
+
+  // Se o usuário ativar o Modo Simplificado enquanto estava na aba "Cursos"
+  // (que deixa de existir), voltamos para "Tarefas" para não sumir a tela.
+  React.useEffect(() => {
+    if (prefs.simplifiedMode && currentTab === 'courses') {
+      setCurrentTab('tasks');
+    }
+  }, [prefs.simplifiedMode, currentTab]);
 
   const renderScreen = () => {
     switch (currentTab) {
-      case 'courses': 
-        return <DashboardScreen onSelectCourse={handleSelectCourse} />;
-      case 'tasks': 
-        return (
-          <TasksScreen 
-            activeCourseFilter={selectedCourseId} 
-            onClearFilter={() => setSelectedCourseId(null)} 
-          />
-        );
-      case 'settings': 
+      case 'courses':
+        return <DashboardScreen />;
+      case 'tasks':
+        return <TasksScreen />;
+      case 'history':
+        return <HistoryScreen />;
+      case 'settings':
         return <AccessibilityPanelScreen />;
-      default: 
-        return <DashboardScreen onSelectCourse={handleSelectCourse} />;
+      default:
+        return <TasksScreen />;
     }
   };
 
@@ -55,48 +70,28 @@ export default function MainTabNavigator() {
       <View style={styles.content}>{renderScreen()}</View>
 
       {/* 🧭 NAV BAR */}
-      <View 
+      <View
         style={[
-          styles.tabBar, 
-          { 
-            backgroundColor: theme.navBg, 
+          styles.tabBar,
+          {
+            backgroundColor: theme.navBg,
             borderTopColor: theme.border,
-            height: prefs.spacing === 'wide' ? 95 : 80 
+            height: prefs.spacing === 'wide' ? 95 : 80
           }
         ]}
       >
-        <Pressable
-          onPress={() => {
-            setSelectedCourseId(null); // Ao clicar direto na aba Cursos, limpa filtros antigos
-            setCurrentTab('courses');
-          }}
-          style={[styles.tabItem, currentTab === 'courses' && { backgroundColor: theme.activeBg }]}
-        >
-          <Text style={{ fontSize: prefs.fontSize === 'extra-large' ? 28 : 24 }}>🎓</Text>
-          <Text style={[styles.tabLabel, { fontSize: getTabFontSize(), color: currentTab === 'courses' ? theme.activeText : theme.inactiveText }]}>
-            Cursos
-          </Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() => setCurrentTab('tasks')}
-          style={[styles.tabItem, currentTab === 'tasks' && { backgroundColor: theme.activeBg }]}
-        >
-          <Text style={{ fontSize: prefs.fontSize === 'extra-large' ? 28 : 24 }}>📋</Text>
-          <Text style={[styles.tabLabel, { fontSize: getTabFontSize(), color: currentTab === 'tasks' ? theme.activeText : theme.inactiveText }]}>
-            Tarefas
-          </Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() => setCurrentTab('settings')}
-          style={[styles.tabItem, currentTab === 'settings' && { backgroundColor: theme.activeBg }]}
-        >
-          <Text style={{ fontSize: prefs.fontSize === 'extra-large' ? 28 : 24 }}>⚙️</Text>
-          <Text style={[styles.tabLabel, { fontSize: getTabFontSize(), color: currentTab === 'settings' ? theme.activeText : theme.inactiveText }]}>
-            Ajustes
-          </Text>
-        </Pressable>
+        {tabs.map((tab) => (
+          <Pressable
+            key={tab.key}
+            onPress={() => setCurrentTab(tab.key)}
+            style={[styles.tabItem, currentTab === tab.key && { backgroundColor: theme.activeBg }]}
+          >
+            <Text style={{ fontSize: prefs.fontSize === 'extra-large' ? 28 : 24 }}>{tab.icon}</Text>
+            <Text style={[styles.tabLabel, { fontSize: getTabFontSize(), color: currentTab === tab.key ? theme.activeText : theme.inactiveText }]}>
+              {tab.label}
+            </Text>
+          </Pressable>
+        ))}
       </View>
     </View>
   );

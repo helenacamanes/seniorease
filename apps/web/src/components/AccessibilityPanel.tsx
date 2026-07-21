@@ -7,6 +7,7 @@ export interface AccessibilityPreferences {
   simplifiedMode: boolean;
   extraConfirmation: boolean;
   reminderFrequency: 'none' | 'daily' | 'weekly';
+  enhancedFeedback: boolean;
 }
 
 interface AccessibilityPanelProps {
@@ -76,6 +77,9 @@ export function AccessibilityPanel({ prefs, onChange }: AccessibilityPanelProps)
             </button>
             <button type="button" onClick={() => onChange({ ...prefs, extraConfirmation: !prefs.extraConfirmation })} className={getBtnStyle(prefs.extraConfirmation)}>
               {prefs.extraConfirmation ? '🔒 Avisos de Segurança Ativos' : '🔒 Ativar Avisos de Segurança'}
+            </button>
+            <button type="button" onClick={() => onChange({ ...prefs, enhancedFeedback: !prefs.enhancedFeedback })} className={getBtnStyle(prefs.enhancedFeedback)}>
+              {prefs.enhancedFeedback ? '🎉 Feedback Visual Reforçado Ligado' : '🎉 Ativar Feedback Visual Reforçado'}
             </button>
           </div>
         </div>

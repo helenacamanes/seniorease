@@ -8,6 +8,8 @@ export interface AccessibilityPreferences {
   highContrast: boolean;
   extraConfirmation?: boolean;
   simplifiedMode?: boolean;
+  reminderFrequency?: 'none' | 'daily' | 'weekly';
+  enhancedFeedback?: boolean;
 }
 
 export interface AccessibilityPanelProps {
@@ -107,6 +109,35 @@ export function AccessibilityPanel({ prefs, onChange }: AccessibilityPanelProps)
             title={prefs.extraConfirmation ? '🔒 Avisos de Segurança Ativos' : '🔒 Ativar Avisos de Segurança'} 
             onPress={() => onChange({ ...prefs, extraConfirmation: !prefs.extraConfirmation })}
             variant={prefs.extraConfirmation ? 'primary' : 'secondary'}
+          />
+          <AccessibleButton 
+            title={prefs.enhancedFeedback ? '🎉 Feedback Visual Reforçado Ligado' : '🎉 Ativar Feedback Visual Reforçado'} 
+            onPress={() => onChange({ ...prefs, enhancedFeedback: !prefs.enhancedFeedback })}
+            variant={prefs.enhancedFeedback ? 'primary' : 'secondary'}
+          />
+        </View>
+      </View>
+
+      {/* 5. LEMBRETES DE ESTUDO */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { fontSize: getFontSize(), color: theme.text }]}>
+          Lembretes de Estudo:
+        </Text>
+        <View style={{ gap: 10 }}>
+          <AccessibleButton
+            title="Não avisar"
+            onPress={() => onChange({ ...prefs, reminderFrequency: 'none' })}
+            variant={prefs.reminderFrequency === 'none' ? 'primary' : 'secondary'}
+          />
+          <AccessibleButton
+            title="Avisar Todo Dia 📅"
+            onPress={() => onChange({ ...prefs, reminderFrequency: 'daily' })}
+            variant={prefs.reminderFrequency === 'daily' ? 'primary' : 'secondary'}
+          />
+          <AccessibleButton
+            title="Avisar Toda Semana 🗓️"
+            onPress={() => onChange({ ...prefs, reminderFrequency: 'weekly' })}
+            variant={prefs.reminderFrequency === 'weekly' ? 'primary' : 'secondary'}
           />
         </View>
       </View>
