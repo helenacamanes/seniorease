@@ -1,19 +1,28 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { auth } from '../../src/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { AccessibilityProvider, useAccessibility } from '../../src/context/AccessibilityContext';
+import ConfirmDialog from '../../src/components/ConfirmDialog';
 
 // Removido o AccessibilityPanel que não será mais usado aqui
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { prefs, loading } = useAccessibility(); // Removido o updatePrefs daqui, já que os ajustes saíram do header
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  const handleLogout = async () => {
-    if ((prefs as any).extraConfirmation && !window.confirm("Você quer mesmo sair do aplicativo agora?")) return;
+  const handleLogout = () => {
+    if (prefs.extraConfirmation) {
+      setShowLogoutConfirm(true);
+      return;
+    }
+    performLogout();
+  };
+
+  const performLogout = async () => {
     await signOut(auth);
     router.push('/');
   };
@@ -62,6 +71,20 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       <main className="flex-1 max-w-7xl w-full mx-auto p-6">
         {children}
       </main>
+
+      <ConfirmDialog
+        visible={showLogoutConfirm}
+        title="Aviso importante 🤔"
+        message="Você quer mesmo sair do aplicativo agora?"
+        confirmLabel="Sim, quero sair"
+        cancelLabel="Não, quero continuar"
+        destructive
+        onConfirm={() => {
+          setShowLogoutConfirm(false);
+          performLogout();
+        }}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </div>
   );
 }

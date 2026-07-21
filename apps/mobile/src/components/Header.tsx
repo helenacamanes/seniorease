@@ -1,8 +1,9 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useAccessibility } from '../context/AccessibilityContext';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface HeaderProps {
   title?: string;
@@ -26,16 +27,11 @@ export function Header({ title = "SeniorEase 🌟" }: HeaderProps) {
     logoutBorder: prefs.highContrast ? '#ffff00' : '#fca5a5',
   };
 
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
   const handleLogout = () => {
     if (prefs.extraConfirmation) {
-      Alert.alert(
-        "Aviso importante 🤔",
-        "Você tem certeza que deseja sair da sua conta agora?",
-        [
-          { text: "Não, quero continuar estudando", style: "cancel" },
-          { text: "Sim, quero sair", style: "destructive", onPress: () => signOut(auth) }
-        ]
-      );
+      setShowLogoutConfirm(true);
     } else {
       signOut(auth);
     }
@@ -57,6 +53,20 @@ export function Header({ title = "SeniorEase 🌟" }: HeaderProps) {
           🚪 Sair
         </Text>
       </TouchableOpacity>
+
+      <ConfirmDialog
+        visible={showLogoutConfirm}
+        title="Aviso importante 🤔"
+        message="Você tem certeza que deseja sair da sua conta agora?"
+        confirmLabel="Sim, quero sair"
+        cancelLabel="Não, quero continuar estudando"
+        destructive
+        onConfirm={() => {
+          setShowLogoutConfirm(false);
+          signOut(auth);
+        }}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </View>
   );
 }

@@ -7,6 +7,7 @@ import { auth, db } from '../lib/firebase';
 import { useAccessibility } from '../context/AccessibilityContext';
 import { GetGuidedSteps, type Task } from '@seniorease/domain';
 import SuccessToast from './WebSuccessToast';
+import ConfirmDialog from './ConfirmDialog';
 
 interface WebTasksProps {
   activeCourseFilter: string | null;
@@ -20,6 +21,7 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
   const [guidedTask, setGuidedTask] = useState<Task | null>(null);
   const [guidedStepIndex, setGuidedStepIndex] = useState(0);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [taskPendingUndo, setTaskPendingUndo] = useState<Task | null>(null);
   // 🌟 Modo Simplificado: começa com a seção de concluídas escondida,
   // para reduzir a quantidade de informação na tela de uma vez.
   const [showCompleted, setShowCompleted] = useState(!prefs.simplifiedMode);
@@ -110,10 +112,9 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
     // 🌟 Confirmação adicional antes de ação crítica: desfazer uma atividade
     // já concluída apaga o registro dela do Histórico, então avisamos antes.
     if (isCompleted && prefs.extraConfirmation) {
-      const confirmed = window.confirm(
-        'Essa atividade vai voltar para "pendente" e sair do seu Histórico. Deseja continuar?'
-      );
-      if (!confirmed) return;
+      const task = tasks.find((t) => t.id === taskId) || null;
+      setTaskPendingUndo(task);
+      return;
     }
     performToggle(taskId, isCompleted);
   };
@@ -242,6 +243,21 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
         visible={!!successMessage}
         message={successMessage || ''}
         onDismiss={() => setSuccessMessage(null)}
+      />
+
+      {/* 🌟 CONFIRMAÇÃO VISUAL ANTES DE DESFAZER UMA ATIVIDADE CONCLUÍDA */}
+      <ConfirmDialog
+        visible={!!taskPendingUndo}
+        title="Desfazer atividade concluída?"
+        message='Essa atividade vai voltar para "pendente" e sair do seu Histórico. Deseja continuar?'
+        confirmLabel="Sim, desfazer"
+        cancelLabel="Cancelar"
+        destructive
+        onConfirm={() => {
+          if (taskPendingUndo) performToggle(taskPendingUndo.id, taskPendingUndo.completed);
+          setTaskPendingUndo(null);
+        }}
+        onCancel={() => setTaskPendingUndo(null)}
       />
     </div>
   );
