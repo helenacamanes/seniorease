@@ -27,7 +27,6 @@ export function LoginScreen({ onAuthSuccess }: LoginScreenProps) {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedCourse, setSelectedCourse] = useState('');
   const [loading, setLoading] = useState(false);
 
   const getFontSize = (type: 'title' | 'body' | 'button') => {
@@ -60,10 +59,15 @@ export function LoginScreen({ onAuthSuccess }: LoginScreenProps) {
       if (isRegistering) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         
-        // 🌟 INVERSÃO DE DEPENDÊNCIA APLICADA NO MOBILE: Injeta o 'db' do Mobile
-        // 🌟 Envia também as preferências (fonte/contraste/espaçamento) que o
-        // usuário já ajustou na tela de boas-vindas, para não serem perdidas.
-        await inicializarPerfilE_Tarefas(db, userCredential.user.uid, name, email, selectedCourse, prefs);
+        // 🌟 Usamos o ID padrão do curso ('smartphone-whatsapp') na inicialização
+        await inicializarPerfilE_Tarefas(
+          db, 
+          userCredential.user.uid, 
+          name, 
+          email, 
+          'smartphone-whatsapp', 
+          prefs
+        );
         
         Alert.alert("Sucesso!", "Sua conta foi criada e suas atividades foram configuradas com sucesso.");
       } else {
@@ -111,20 +115,6 @@ export function LoginScreen({ onAuthSuccess }: LoginScreenProps) {
               </View>
             )}
 
-            {isRegistering && (
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: theme.text, fontSize: getFontSize('body') }]}>Escolha sua Turma: <Text style={{ color: '#ef4444' }}>*</Text></Text>
-                <View style={{ gap: 10, marginTop: 4 }}>
-                  <TouchableOpacity style={[styles.courseOption, { borderColor: selectedCourse === 'tecnologia-iniciantes' ? theme.btnPrimary : theme.border }, selectedCourse === 'tecnologia-iniciantes' && { backgroundColor: '#e0f2fe' }]} onPress={() => setSelectedCourse('tecnologia-iniciantes')}>
-                    <Text style={{ fontSize: getFontSize('body'), color: theme.text, fontWeight: 'bold' }}>{selectedCourse === 'tecnologia-iniciantes' ? '🟢 ' : '⚪ '} Tecnologia para Iniciantes</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.courseOption, { borderColor: selectedCourse === 'smartphone-whatsapp' ? theme.btnPrimary : theme.border }, selectedCourse === 'smartphone-whatsapp' && { backgroundColor: '#e0f2fe' }]} onPress={() => setSelectedCourse('smartphone-whatsapp')}>
-                    <Text style={{ fontSize: getFontSize('body'), color: theme.text, fontWeight: 'bold' }}>{selectedCourse === 'smartphone-whatsapp' ? '🟢 ' : '⚪ '} Uso do Smartphone e Whatsapp</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: theme.text, fontSize: getFontSize('body') }]}>Seu E-mail:</Text>
               <TextInput style={[styles.input, { backgroundColor: theme.inputBg, borderColor: theme.border, color: theme.text, fontSize: getFontSize('body') }]} placeholder="exemplo@email.com" placeholderTextColor="#94a3b8" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
@@ -137,8 +127,8 @@ export function LoginScreen({ onAuthSuccess }: LoginScreenProps) {
 
             <View style={[styles.buttonGroup, { marginTop: 10, gap: 12 }]}>
               <TouchableOpacity style={[styles.btn, { backgroundColor: theme.btnPrimary }]} onPress={() => {
-                if (!email || !password || (isRegistering && (!name || !selectedCourse))) {
-                  Alert.alert("Aviso", "Preencha todos os campos e selecione a sua turma.");
+                if (!email || !password || (isRegistering && !name)) {
+                  Alert.alert("Aviso", "Preencha todos os campos para continuar.");
                   return;
                 }
                 executeAuth();
@@ -179,5 +169,4 @@ const styles = StyleSheet.create({
   inputGroup: { flexDirection: 'column', gap: 6, width: '100%' },
   label: { fontWeight: '600' },
   input: { borderWidth: 2, padding: 14, borderRadius: 12, minHeight: 56 },
-  courseOption: { borderWidth: 2, padding: 16, borderRadius: 12, backgroundColor: '#ffffff', minHeight: 56, justifyContent: 'center' },
 });

@@ -27,9 +27,6 @@ export default function MainTabNavigator() {
     activeBg: prefs.highContrast ? '#222222' : '#f1f5f9',
   };
 
-  // 🌟 MODO SIMPLIFICADO: menos abas na tela, para reduzir a quantidade de
-  // escolhas e complexidade visual. "Cursos" (dashboard de progresso) some
-  // e o app abre direto nas Tarefas, que é a ação mais usada no dia a dia.
   const tabs: { key: TabKey; icon: string; label: string }[] = prefs.simplifiedMode
     ? [
       { key: 'tasks', icon: '📋', label: 'Tarefas' },
@@ -38,7 +35,6 @@ export default function MainTabNavigator() {
 
     ]
     : [
-      { key: 'courses', icon: '🎓', label: 'Cursos' },
       { key: 'tasks', icon: '📋', label: 'Tarefas' },
       { key: 'history', icon: '🗂️', label: 'Histórico' },
       { key: 'settings', icon: '⚙️', label: 'Ajustes' },
@@ -46,8 +42,6 @@ export default function MainTabNavigator() {
 
     ];
 
-  // Se o usuário ativar o Modo Simplificado enquanto estava na aba "Cursos"
-  // (que deixa de existir), voltamos para "Tarefas" para não sumir a tela.
   React.useEffect(() => {
     if (prefs.simplifiedMode && currentTab === 'courses') {
       setCurrentTab('tasks');

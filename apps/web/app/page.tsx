@@ -16,6 +16,7 @@ export default function WelcomePage() {
     spacing: 'normal',
     simplifiedMode: false,
     extraConfirmation: false,
+    enhancedFeedback: false,
     reminderFrequency: 'none'
   });
 

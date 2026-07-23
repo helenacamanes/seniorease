@@ -57,8 +57,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           </span>
           <div className="flex items-center gap-6">
             {/* O BOTÃO "AJUSTAR TELA" FOI REMOVIDO DAQUI */}
-            <button 
-              onClick={handleLogout} 
+            <button
+              onClick={handleLogout}
               className={`transition-all bg-transparent border-0 cursor-pointer ${theme.logoutText} ${getFontSizeClass()}`}
             >
               Sair
@@ -71,7 +71,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       <main className="flex-1 max-w-7xl w-full mx-auto p-6">
         {children}
       </main>
-
       <ConfirmDialog
         visible={showLogoutConfirm}
         title="Aviso importante 🤔"

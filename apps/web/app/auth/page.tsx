@@ -1,16 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-// 🌟 IMPORTANTE: Puxamos o auth e o db locais da Web
 import { auth, db } from '@/lib/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { inicializarPerfilE_Tarefas } from '@seniorease/domain';
 import { useRouter } from 'next/navigation';
 
-// 🌟 Mesmo formato de preferências usado na tela de boas-vindas (app/page.tsx).
-// Como esta rota fica FORA do AccessibilityProvider (que exige usuário logado),
-// lemos aqui o que foi salvo em 'pre_prefs' para manter a mesma aparência
-// (fonte grande, alto contraste, espaçamento) que o usuário já escolheu.
 interface LocalPreferences {
   fontSize: 'normal' | 'large' | 'extra-large';
   highContrast: boolean;
@@ -39,7 +34,6 @@ export default function WebAuthPage() {
       const stored = localStorage.getItem('pre_prefs');
       if (stored) setPrefs({ ...DEFAULT_LOCAL_PREFS, ...JSON.parse(stored) });
     } catch {
-      // se der ruim ao ler, seguimos com o padrão sem travar a tela
     }
   }, []);
 
@@ -70,19 +64,10 @@ export default function WebAuthPage() {
     setError('');
     setLoading(true);
 
-    if (isRegistering && (!name || !selectedCourse)) {
-      setError('Por favor, preencha seu nome e escolha uma turma.');
-      setLoading(false);
-      return;
-    }
-
     try {
       if (isRegistering) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
-        // 🌟 Recupera as preferências que o usuário ajustou ANTES de criar a conta
-        // (salvas na tela de boas-vindas em 'pre_prefs'). Sem isso, o cadastro
-        // sempre voltava para o padrão e o ajuste de letra/contraste era perdido.
         let initialPrefs;
         try {
           const stored = localStorage.getItem('pre_prefs');
@@ -91,7 +76,6 @@ export default function WebAuthPage() {
           console.warn('Não foi possível ler as preferências salvas antes do cadastro:', parseError);
         }
 
-        // 🌟 INVERSÃO DE DEPENDÊNCIA APLICADA NA WEB: Injeta o 'db' da Web
         await inicializarPerfilE_Tarefas(db, userCredential.user.uid, name, email, selectedCourse, initialPrefs);
 
         localStorage.removeItem('pre_prefs');
@@ -128,23 +112,6 @@ export default function WebAuthPage() {
               <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={{ width: '100%', padding: fieldPadding, fontSize: `${getFontSize('input')}px`, borderRadius: '8px', border: `2px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.text }} placeholder="Digite seu nome" />
             </div>
           )}
-
-          {isRegistering && (
-            <div>
-              <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', fontSize: `${getFontSize('label')}px`, color: theme.text }}>
-                Escolha a sua Turma: <span style={{ color: theme.errorText }}>*</span>
-              </label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <button type="button" onClick={() => setSelectedCourse('tecnologia-iniciantes')} style={{ padding: fieldPadding, fontSize: `${getFontSize('input')}px`, textAlign: 'left', borderRadius: '12px', border: '2px solid', borderColor: selectedCourse === 'tecnologia-iniciantes' ? theme.btnPrimaryBg : theme.border, backgroundColor: selectedCourse === 'tecnologia-iniciantes' ? (prefs.highContrast ? '#332b00' : '#e0f2fe') : theme.inputBg, color: theme.text, cursor: 'pointer', fontWeight: 'bold' }}>
-                  {selectedCourse === 'tecnologia-iniciantes' ? '🟢 ' : '⚪ '} Tecnologia para Iniciantes
-                </button>
-                <button type="button" onClick={() => setSelectedCourse('smartphone-whatsapp')} style={{ padding: fieldPadding, fontSize: `${getFontSize('input')}px`, textAlign: 'left', borderRadius: '12px', border: '2px solid', borderColor: selectedCourse === 'smartphone-whatsapp' ? theme.btnPrimaryBg : theme.border, backgroundColor: selectedCourse === 'smartphone-whatsapp' ? (prefs.highContrast ? '#332b00' : '#e0f2fe') : theme.inputBg, color: theme.text, cursor: 'pointer', fontWeight: 'bold' }}>
-                  {selectedCourse === 'smartphone-whatsapp' ? '🟢 ' : '⚪ '} Uso do Smartphone e Whatsapp
-                </button>
-              </div>
-            </div>
-          )}
-
           <div>
             <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '6px', fontSize: `${getFontSize('label')}px`, color: theme.text }}>E-mail:</label>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%', padding: fieldPadding, fontSize: `${getFontSize('input')}px`, borderRadius: '8px', border: `2px solid ${theme.border}`, backgroundColor: theme.inputBg, color: theme.text }} placeholder="exemplo@email.com" required />

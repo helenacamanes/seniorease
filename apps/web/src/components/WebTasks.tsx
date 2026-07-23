@@ -2,19 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { useAccessibility } from '../context/AccessibilityContext';
 import { GetGuidedSteps, type Task } from '@seniorease/domain';
 import SuccessToast from './WebSuccessToast';
 import ConfirmDialog from './ConfirmDialog';
 
-interface WebTasksProps {
-  activeCourseFilter: string | null;
-  onClearFilter: () => void;
-}
-
-export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasksProps) {
+export default function WebTasks() {
   const { prefs } = useAccessibility();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +21,6 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
   const [taskPendingComplete, setTaskPendingComplete] = useState<Task | null>(null);
   const [taskToStartGuided, setTaskToStartGuided] = useState<Task | null>(null);
   const [showConfirmCloseGuided, setShowConfirmCloseGuided] = useState(false);
-  const [showConfirmClearFilter, setShowConfirmClearFilter] = useState(false);
   const [pendingToggleCompletedSection, setPendingToggleCompletedSection] = useState(false);
 
   const [showCompleted, setShowCompleted] = useState(!prefs.simplifiedMode);
@@ -36,6 +30,8 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
   }, [prefs.simplifiedMode]);
 
   useEffect(() => {
+    const DEFAULT_COURSE_ID = 'smartphone-whatsapp';
+
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (!user) {
         setTasks([]);
@@ -46,13 +42,37 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
       const tasksRef = collection(db, 'users', user.uid, 'tasks');
       const unsubscribeSnapshot = onSnapshot(
         tasksRef,
-        (snapshot) => {
-          const tasksList: Task[] = [];
-          snapshot.forEach((docSnap) => {
-            tasksList.push({ id: docSnap.id, ...docSnap.data() } as Task);
-          });
-          setTasks(tasksList);
-          setLoading(false);
+        async (snapshot) => {
+          if (!snapshot.empty) {
+            const tasksList: Task[] = [];
+            snapshot.forEach((docSnap) => {
+              tasksList.push({ id: docSnap.id, ...docSnap.data() } as Task);
+            });
+            setTasks(tasksList);
+            setLoading(false);
+          } else {
+            // Carrega o curso único padrão se o usuário não tiver tarefas salvas
+            try {
+              const courseDoc = await getDoc(doc(db, 'courses', DEFAULT_COURSE_ID));
+              if (courseDoc.exists()) {
+                const courseData = courseDoc.data();
+                const defaultTasks: Task[] = (courseData.tasks || []).map((t: any, index: number) => ({
+                  id: `task-${index}`,
+                  title: t.title,
+                  category: t.category || 'Geral',
+                  steps: t.steps || [],
+                  completed: false,
+                  courseId: DEFAULT_COURSE_ID,
+                  courseName: courseData.name || 'Curso Principal',
+                }));
+                setTasks(defaultTasks);
+              }
+            } catch (err) {
+              console.error('Erro ao carregar curso padrão:', err);
+            } finally {
+              setLoading(false);
+            }
+          }
         },
         (error) => {
           console.error('Erro ao carregar tarefas na Web:', error);
@@ -73,7 +93,6 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
     textMuted: prefs.highContrast ? '#eab308' : '#64748b',
     buttonActiveBg: prefs.highContrast ? '#16a34a' : '#22c55e',
     buttonClearBg: prefs.highContrast ? '#222222' : '#f1f5f9',
-    buttonClearText: prefs.highContrast ? '#facc15' : '#334155',
     stepBg: prefs.highContrast ? '#1c1c1c' : '#f1f5f9',
   };
 
@@ -83,32 +102,34 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
     return type === 'title' ? (isExtra ? '28px' : isLarge ? '24px' : '20px') : (isExtra ? '20px' : isLarge ? '17px' : '15px');
   };
 
-  const filteredTasks = activeCourseFilter ? tasks.filter((t) => t.courseId === activeCourseFilter) : tasks;
-  const activeTasks = filteredTasks.filter((t) => !t.completed);
-  const finishedTasks = filteredTasks.filter((t) => t.completed);
-  const currentCourseName = activeCourseFilter && filteredTasks.length > 0 ? filteredTasks[0].courseName : '';
+  const activeTasks = tasks.filter((t) => !t.completed);
+  const finishedTasks = tasks.filter((t) => t.completed);
 
   const performToggle = async (taskId: string, isCompleted: boolean) => {
     const user = auth.currentUser;
-    if (!user) return;
 
-    try {
-      const taskDocRef = doc(db, 'users', user.uid, 'tasks', taskId);
-      await updateDoc(taskDocRef, {
-        completed: !isCompleted,
-        completedAt: !isCompleted ? new Date().toISOString() : null,
-      });
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, completed: !isCompleted } : t))
+    );
 
-      if (!isCompleted) {
-        if (prefs.enhancedFeedback) {
-          setSuccessMessage('Muito bem! Atividade concluída!');
-        } else {
-          alert('Muito bem! Atividade concluída!');
-        }
+    if (user) {
+      try {
+        const taskDocRef = doc(db, 'users', user.uid, 'tasks', taskId);
+        await updateDoc(taskDocRef, {
+          completed: !isCompleted,
+          completedAt: !isCompleted ? new Date().toISOString() : null,
+        });
+      } catch (error) {
+        // Se a subcoleção do usuário não existir no Firestore, tratar em background
       }
-    } catch (error) {
-      console.error('Erro ao alterar status da tarefa na Web:', error);
-      alert('Não foi possível salvar o seu progresso. Verifique sua internet.');
+    }
+
+    if (!isCompleted) {
+      if (prefs.enhancedFeedback) {
+        setSuccessMessage('Muito bem! Atividade concluída!');
+      } else {
+        alert('Muito bem! Atividade concluída!');
+      }
     }
   };
 
@@ -158,27 +179,6 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-
-      {activeCourseFilter && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px', backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '14px', transition: transitionStyle }}>
-          <span style={{ fontSize: getFontSize('body'), color: theme.text }}>
-            Mostrando tarefas de: <strong>{currentCourseName}</strong>
-          </span>
-          <button
-            onClick={() => {
-              if (prefs.extraConfirmation) {
-                setShowConfirmClearFilter(true);
-              } else {
-                onClearFilter();
-              }
-            }}
-            style={{ padding: '12px 24px', cursor: 'pointer', borderRadius: '10px', fontWeight: 'bold', border: `3px solid ${theme.borderColor}`, backgroundColor: theme.buttonClearBg, color: theme.buttonClearText, fontSize: getFontSize('body'), transition: transitionStyle }}
-          >
-            Mostrar Todas as Tarefas
-          </button>
-        </div>
-      )}
-
       <h2 style={{ fontSize: getFontSize('title'), color: theme.text, margin: 0 }}>
         Atividades para Fazer ({activeTasks.length})
       </h2>
@@ -191,9 +191,6 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
             <div key={task.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '14px', padding: prefs.spacing === 'wide' ? '24px' : '16px', transition: transitionStyle }}>
               <div onClick={() => requestOpenGuidedFlow(task)} style={{ cursor: 'pointer', flex: 1 }}>
                 <span style={{ fontSize: getFontSize('body'), fontWeight: 'bold', color: theme.text, display: 'block' }}>{task.title}</span>
-                {!prefs.simplifiedMode && !activeCourseFilter && task.courseName && (
-                  <span style={{ color: theme.textMuted, fontSize: '13px', fontWeight: 'bold' }}>{task.courseName}</span>
-                )}
                 <span style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginTop: '4px' }}>Clique para ver o passo a passo</span>
               </div>
               <button onClick={() => toggleTask(task.id, task.completed)} style={{ padding: '12px 20px', cursor: 'pointer', borderRadius: '8px', border: `2px solid ${theme.borderColor}`, backgroundColor: theme.buttonClearBg, color: theme.text, fontSize: getFontSize('body'), transition: transitionStyle }}>
@@ -219,19 +216,18 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
         </button>
       )}
 
-      {showCompleted &&
-        !prefs.simplifiedMode && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {finishedTasks.map((task) => (
-              <div key={task.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '14px', padding: prefs.spacing === 'wide' ? '24px' : '16px', opacity: 0.75, transition: transitionStyle }}>
-                <span style={{ fontSize: getFontSize('body'), color: theme.text, textDecoration: 'line-through', display: 'block' }}>{task.title}</span>
-                <button onClick={() => toggleTask(task.id, task.completed)} style={{ padding: '12px 20px', cursor: 'pointer', borderRadius: '8px', border: 'transparent', backgroundColor: theme.buttonActiveBg, color: '#ffffff', fontWeight: 'bold', fontSize: getFontSize('body'), transition: transitionStyle }}>
-                  Concluída (Refazer)
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+      {showCompleted && !prefs.simplifiedMode && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {finishedTasks.map((task) => (
+            <div key={task.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '14px', padding: prefs.spacing === 'wide' ? '24px' : '16px', opacity: 0.75, transition: transitionStyle }}>
+              <span style={{ fontSize: getFontSize('body'), color: theme.text, textDecoration: 'line-through', display: 'block' }}>{task.title}</span>
+              <button onClick={() => toggleTask(task.id, task.completed)} style={{ padding: '12px 20px', cursor: 'pointer', borderRadius: '8px', border: 'transparent', backgroundColor: theme.buttonActiveBg, color: '#ffffff', fontWeight: 'bold', fontSize: getFontSize('body'), transition: transitionStyle }}>
+                Concluída (Refazer)
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {guidedTask && (
         <div onClick={() => setShowConfirmCloseGuided(true)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
@@ -252,17 +248,13 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
                 Concluir Atividade
               </button>
             ) : (
-              <button
-                onClick={() => setGuidedStepIndex((i) => i + 1)}
-                style={{ padding: '16px', cursor: 'pointer', borderRadius: '12px', border: 'none', backgroundColor: theme.buttonActiveBg, color: '#ffffff', fontWeight: 'bold', fontSize: getFontSize('body'), transition: transitionStyle }}>
+              <button onClick={() => setGuidedStepIndex((i) => i + 1)} style={{ padding: '16px', cursor: 'pointer', borderRadius: '12px', border: 'none', backgroundColor: theme.buttonActiveBg, color: '#ffffff', fontWeight: 'bold', fontSize: getFontSize('body'), transition: transitionStyle }}>
                 Avançar Passo
               </button>
             )}
 
             {guidedStepIndex > 0 && (
-              <button
-                onClick={() => setGuidedStepIndex((i) => i - 1)}
-                style={{ padding: '12px', cursor: 'pointer', borderRadius: '12px', border: `2px solid ${theme.borderColor}`, backgroundColor: 'transparent', color: theme.text, fontWeight: 'bold', fontSize: getFontSize('body'), transition: transitionStyle }}>
+              <button onClick={() => setGuidedStepIndex((i) => i - 1)} style={{ padding: '12px', cursor: 'pointer', borderRadius: '12px', border: `2px solid ${theme.borderColor}`, backgroundColor: 'transparent', color: theme.text, fontWeight: 'bold', fontSize: getFontSize('body'), transition: transitionStyle }}>
                 Passo Anterior
               </button>
             )}
@@ -274,11 +266,7 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
         </div>
       )}
 
-      <SuccessToast
-        visible={!!successMessage}
-        message={successMessage || ''}
-        onDismiss={() => setSuccessMessage(null)}
-      />
+      <SuccessToast visible={!!successMessage} message={successMessage || ''} onDismiss={() => setSuccessMessage(null)} />
 
       <ConfirmDialog
         visible={!!taskPendingComplete}
@@ -336,22 +324,9 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
       />
 
       <ConfirmDialog
-        visible={showConfirmClearFilter}
-        title="Mostrar Todas as Tarefas?"
-        message="Deseja remover o filtro atual e visualizar a lista completa de atividades?"
-        confirmLabel="Sim, mostrar todas"
-        cancelLabel="Cancelar"
-        onConfirm={() => {
-          setShowConfirmClearFilter(false);
-          onClearFilter();
-        }}
-        onCancel={() => setShowConfirmClearFilter(false)}
-      />
-
-      <ConfirmDialog
         visible={pendingToggleCompletedSection}
-        title={showCompleted ? "Ocultar Tarefas Concluídas?" : "Mostrar Tarefas Concluídas?"}
-        message={showCompleted ? "Deseja ocultar a lista de tarefas concluídas?" : "Deseja exibir a lista de tarefas concluídas?"}
+        title={showCompleted ? 'Ocultar Tarefas Concluídas?' : 'Mostrar Tarefas Concluídas?'}
+        message={showCompleted ? 'Deseja ocultar a lista de tarefas concluídas?' : 'Deseja exibir a lista de tarefas concluídas?'}
         confirmLabel="Sim, confirmar"
         cancelLabel="Cancelar"
         onConfirm={() => {

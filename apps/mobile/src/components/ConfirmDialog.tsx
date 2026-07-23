@@ -13,9 +13,6 @@ interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
-// 🌟 Confirmação visual antes de ações críticas (sair da conta, desfazer uma
-// tarefa concluída, etc). Substitui o Alert.alert nativo, que não respeita
-// alto contraste nem tamanho de fonte escolhidos pelo usuário.
 export function ConfirmDialog({
   visible,
   title,

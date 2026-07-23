@@ -13,7 +13,6 @@ type TabKey = 'courses' | 'tasks' | 'history' | 'settings' | 'profile';
 export default function MainLayout() {
   const { prefs } = useAccessibility();
   const [currentTab, setCurrentTab] = useState<TabKey>('courses');
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
 
   // Paleta adaptável baseada nas preferências de acessibilidade
   const theme = {
@@ -25,8 +24,7 @@ export default function MainLayout() {
     activeText: prefs.highContrast ? '#ffffff' : '#1e40af',
   };
 
-  const handleSelectCourse = (courseId: string) => {
-    setSelectedCourseId(courseId);
+  const handleSelectCourse = (_courseId: string) => {
     setCurrentTab('tasks');
   };
 
@@ -44,7 +42,6 @@ export default function MainLayout() {
     ]
     : [
       { key: 'profile', icon: '👤', label: 'Meu Perfil' },
-      { key: 'courses', icon: '🎓', label: 'Cursos' },
       { key: 'tasks', icon: '📋', label: 'Tarefas' },
       { key: 'history', icon: '🗂️', label: 'Histórico' },
       { key: 'settings', icon: '⚙️', label: 'Ajustes' }
@@ -61,12 +58,7 @@ export default function MainLayout() {
       case 'courses':
         return <WebDashboard onSelectCourse={handleSelectCourse} />;
       case 'tasks':
-        return (
-          <WebTasks
-            activeCourseFilter={selectedCourseId}
-            onClearFilter={() => setSelectedCourseId(null)}
-          />
-        );
+        return <WebTasks />;
       case 'history':
         return <WebHistory />;
       case 'settings':
@@ -74,14 +66,14 @@ export default function MainLayout() {
       case 'profile':
         return <ProfileScreen />;
       default:
-        return <WebTasks activeCourseFilter={null} onClearFilter={() => { }} />;
+        return <WebTasks />;
     }
   };
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: theme.bg, fontFamily: 'sans-serif' }}>
 
-      {/* 🧭 BARRA LATERAL ACESSÍVEL (Único local de navegação e ajustes agora) */}
+      {/* 🧭 BARRA LATERAL ACESSÍVEL */}
       <nav style={{
         width: prefs.spacing === 'wide' ? '320px' : '260px',
         backgroundColor: theme.sidebarBg,
@@ -98,10 +90,7 @@ export default function MainLayout() {
         {navItems.map((item) => (
           <button
             key={item.key}
-            onClick={() => {
-              if (item.key === 'courses') setSelectedCourseId(null);
-              setCurrentTab(item.key);
-            }}
+            onClick={() => setCurrentTab(item.key)}
             style={{
               display: 'flex', alignItems: 'center', gap: '14px', width: '100%', padding: '16px',
               border: `2px solid ${currentTab === item.key ? theme.borderColor : 'transparent'}`,

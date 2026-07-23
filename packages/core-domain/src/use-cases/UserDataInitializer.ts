@@ -5,10 +5,13 @@ const DEFAULT_PREFERENCES: AccessibilityPreferences = {
   fontSize: 'normal',
   highContrast: false,
   spacing: 'normal',
-  simplifiedMode: false,
-  extraConfirmation: true,
-  reminderFrequency: 'none',
+  basicMode: false,
+  requireConfirmation: true,
+  reduceAnimations: false,
   enhancedFeedback: true,
+  notificationsEnabled: true,
+  reminderTime: '09:00',
+
 };
 
 export const inicializarPerfilE_Tarefas = async (
@@ -17,17 +20,14 @@ export const inicializarPerfilE_Tarefas = async (
   name: string,
   email: string,
   cursoId: string,
-  // 🌟 Preferências que o usuário já escolheu ANTES de criar a conta
-  // (na tela de boas-vindas / preferências). Se nada for passado,
-  // caímos no padrão de sempre.
   initialPrefs?: Partial<AccessibilityPreferences>
 ) => {
+  let tarefasParaCopiar: any[] = [];
+  let nomeAmigavelCurso = 'Curso Geral';
+
   try {
     const courseDocRef = doc(db, 'courses', cursoId);
     const courseSnapshot = await getDoc(courseDocRef);
-
-    let tarefasParaCopiar: any[] = [];
-    let nomeAmigavelCurso = 'Curso Geral';
 
     if (courseSnapshot.exists()) {
       const data = courseSnapshot.data();
@@ -38,22 +38,35 @@ export const inicializarPerfilE_Tarefas = async (
         { title: 'Assistir ao vídeo de introdução da plataforma', category: 'Introdução' }
       ];
     }
+  } catch (courseError) {
+    console.warn("Aviso: Não foi possível carregar as tarefas do curso. Usando tarefas padrão.", courseError);
+    tarefasParaCopiar = [
+      { title: 'Assistir ao vídeo de introdução da plataforma', category: 'Introdução' }
+    ];
+  }
 
-    const finalPreferences: AccessibilityPreferences = {
-      ...DEFAULT_PREFERENCES,
-      ...initialPrefs,
-    };
+  const finalPreferences: AccessibilityPreferences = {
+    ...DEFAULT_PREFERENCES,
+    ...initialPrefs,
+  };
 
-    const userRef = doc(db, 'users', uid);
+  const userRef = doc(db, 'users', uid);
+
+  try {
     await setDoc(userRef, {
       name: name || 'Estudante Conectado',
-      email: email,
+      email: email || '',
       selectedCourse: nomeAmigavelCurso,
       courseId: cursoId,
       createdAt: new Date(),
       preferences: finalPreferences,
-    });
+    }, { merge: true });
+  } catch (profileError) {
+    console.error("Erro ao gravar perfil do usuário:", profileError);
+    throw profileError;
+  }
 
+  try {
     const userTasksCollectionRef = collection(db, 'users', uid, 'tasks');
     for (const tarefa of tarefasParaCopiar) {
       const novaTarefaRef = doc(userTasksCollectionRef);
@@ -61,13 +74,11 @@ export const inicializarPerfilE_Tarefas = async (
         title: tarefa.title,
         category: tarefa.category,
         completed: false,
-        // 🌟 Necessário para o Web conseguir agrupar/filtrar tarefas por curso
         courseId: cursoId,
         courseName: nomeAmigavelCurso,
       });
     }
-  } catch (error) {
-    console.error("Erro no core-domain ao inicializar dados:", error);
-    throw error;
+  } catch (tasksError) {
+    console.error("Erro ao criar tarefas iniciais do usuário:", tasksError);
   }
 };
