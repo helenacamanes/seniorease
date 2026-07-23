@@ -5,8 +5,9 @@ import TasksScreen from '../screens/TasksScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import AccessibilityPanelScreen from '../screens/AccessibilityPanelScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 
-type TabKey = 'courses' | 'tasks' | 'history' | 'settings';
+type TabKey = 'courses' | 'tasks' | 'history' | 'settings' | 'profile';
 
 export default function MainTabNavigator() {
   const { prefs } = useAccessibility();
@@ -31,16 +32,19 @@ export default function MainTabNavigator() {
   // e o app abre direto nas Tarefas, que é a ação mais usada no dia a dia.
   const tabs: { key: TabKey; icon: string; label: string }[] = prefs.simplifiedMode
     ? [
-        { key: 'tasks', icon: '📋', label: 'Tarefas' },
-        { key: 'history', icon: '🗂️', label: 'Histórico' },
-        { key: 'settings', icon: '⚙️', label: 'Ajustes' },
-      ]
+      { key: 'tasks', icon: '📋', label: 'Tarefas' },
+      { key: 'settings', icon: '⚙️', label: 'Ajustes' },
+      { key: 'profile', icon: '👤', label: 'Perfil' }
+
+    ]
     : [
-        { key: 'courses', icon: '🎓', label: 'Cursos' },
-        { key: 'tasks', icon: '📋', label: 'Tarefas' },
-        { key: 'history', icon: '🗂️', label: 'Histórico' },
-        { key: 'settings', icon: '⚙️', label: 'Ajustes' },
-      ];
+      { key: 'courses', icon: '🎓', label: 'Cursos' },
+      { key: 'tasks', icon: '📋', label: 'Tarefas' },
+      { key: 'history', icon: '🗂️', label: 'Histórico' },
+      { key: 'settings', icon: '⚙️', label: 'Ajustes' },
+      { key: 'profile', icon: '👤', label: 'Perfil' }
+
+    ];
 
   // Se o usuário ativar o Modo Simplificado enquanto estava na aba "Cursos"
   // (que deixa de existir), voltamos para "Tarefas" para não sumir a tela.
@@ -60,6 +64,8 @@ export default function MainTabNavigator() {
         return <HistoryScreen />;
       case 'settings':
         return <AccessibilityPanelScreen />;
+      case 'profile':
+        return <ProfileScreen />;
       default:
         return <TasksScreen />;
     }

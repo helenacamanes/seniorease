@@ -1,25 +1,19 @@
 {
-  "name": "seniorease-monorepo",
-  "version": "1.0.0",
-  "private": "true",
-  "description": "",
+  "name": "seniorease",
+  "private": true,
+  "packageManager": "npm@10.8.2",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
-  "devDependencies": {
-    "typescript": "^5.0.0"
-  },
   "scripts": {
-    "test": "npm run test --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present"
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "test": "turbo test"
   },
-  "keywords": [],
-  "author": "@helenacamanes",
-  "dependencies": {
-    "@react-native-async-storage/async-storage": "2.2.0",
-    "firebase": "^12.16.0",
-    "react-dom": "19.2.3",
-    "react-native-web": "^0.21.2"
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.0.0"
   }
 }

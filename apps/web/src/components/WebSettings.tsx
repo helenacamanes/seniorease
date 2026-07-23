@@ -230,6 +230,88 @@ export default function WebSettings() {
           </button>
         </div>
       </section>
+      {/* 🎬 REDUZIR ANIMAÇÕES */}
+      <section
+        style={{
+          backgroundColor: theme.card,
+          border: `3px solid ${theme.borderColor}`,
+          borderRadius: '16px',
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+        }}
+      >
+        <h2
+          style={{
+            fontSize: getFontSize('body'),
+            fontWeight: 'bold',
+            color: theme.text,
+            margin: 0,
+          }}
+        >
+          🎬 Reduzir Animações
+        </h2>
+
+        <p
+          style={{
+            fontSize: getFontSize('body'),
+            color: theme.textMuted,
+            margin: 0,
+          }}
+        >
+          Remove transições e animações para deixar a navegação mais estável e
+          confortável.
+        </p>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: '12px',
+          }}
+        >
+          <button
+            onClick={() => updatePreference('reduceMotion', false)}
+            style={{
+              padding: '16px',
+              borderRadius: '12px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              fontSize: getFontSize('body'),
+              border: `2px solid ${theme.borderColor}`,
+              backgroundColor: !prefs.reduceMotion
+                ? theme.buttonActiveBg
+                : theme.buttonBg,
+              color: !prefs.reduceMotion
+                ? theme.buttonActiveText
+                : theme.text,
+            }}
+          >
+            Animações Normais
+          </button>
+
+          <button
+            onClick={() => updatePreference('reduceMotion', true)}
+            style={{
+              padding: '16px',
+              borderRadius: '12px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              fontSize: getFontSize('body'),
+              border: `2px solid ${theme.borderColor}`,
+              backgroundColor: prefs.reduceMotion
+                ? theme.buttonActiveBg
+                : theme.buttonBg,
+              color: prefs.reduceMotion
+                ? theme.buttonActiveText
+                : theme.text,
+            }}
+          >
+            🎬 Reduzir Animações
+          </button>
+        </div>
+      </section>
     </div>
   );
 }

@@ -6,7 +6,8 @@
   "types": "./src/index.ts",
   "scripts": {
     "test": "jest",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "lint": "eslint"
   },
   "keywords": [],
   "author": "",

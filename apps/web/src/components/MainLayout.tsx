@@ -6,8 +6,9 @@ import WebDashboard from './WebDashboard';
 import WebTasks from './WebTasks';
 import WebHistory from './WebHistory';
 import WebSettings from './WebSettings';
+import ProfileScreen from './WebProfile';
 
-type TabKey = 'courses' | 'tasks' | 'history' | 'settings';
+type TabKey = 'courses' | 'tasks' | 'history' | 'settings' | 'profile';
 
 export default function MainLayout() {
   const { prefs } = useAccessibility();
@@ -35,24 +36,20 @@ export default function MainLayout() {
     return '16px';
   };
 
-  // 🌟 MODO SIMPLIFICADO: menos itens no menu, para reduzir a quantidade de
-  // escolhas e complexidade visual. "Cursos" (dashboard de progresso) some
-  // e o app abre direto nas Tarefas, que é a ação mais usada no dia a dia.
   const navItems: { key: TabKey; icon: string; label: string }[] = prefs.simplifiedMode
     ? [
-        { key: 'tasks', icon: '📋', label: 'Minhas Tarefas' },
-        { key: 'history', icon: '🗂️', label: 'Histórico' },
-        { key: 'settings', icon: '⚙️', label: 'Ajustes' },
-      ]
+      { key: 'profile', icon: '👤', label: 'Meu Perfil' },
+      { key: 'tasks', icon: '📋', label: 'Tarefas' },
+      { key: 'settings', icon: '⚙️', label: 'Ajustes' }
+    ]
     : [
-        { key: 'courses', icon: '🎓', label: 'Cursos' },
-        { key: 'tasks', icon: '📋', label: 'Minhas Tarefas' },
-        { key: 'history', icon: '🗂️', label: 'Histórico' },
-        { key: 'settings', icon: '⚙️', label: 'Ajustes' },
-      ];
+      { key: 'profile', icon: '👤', label: 'Meu Perfil' },
+      { key: 'courses', icon: '🎓', label: 'Cursos' },
+      { key: 'tasks', icon: '📋', label: 'Tarefas' },
+      { key: 'history', icon: '🗂️', label: 'Histórico' },
+      { key: 'settings', icon: '⚙️', label: 'Ajustes' }
+    ];
 
-  // Se ligar o Modo Simplificado enquanto está na aba "Cursos" (que some),
-  // voltamos para "Tarefas" para a tela não ficar em branco.
   useEffect(() => {
     if (prefs.simplifiedMode && currentTab === 'courses') {
       setCurrentTab('tasks');
@@ -74,8 +71,10 @@ export default function MainLayout() {
         return <WebHistory />;
       case 'settings':
         return <WebSettings />;
+      case 'profile':
+        return <ProfileScreen />;
       default:
-        return <WebTasks activeCourseFilter={null} onClearFilter={() => {}} />;
+        return <WebTasks activeCourseFilter={null} onClearFilter={() => { }} />;
     }
   };
 

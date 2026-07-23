@@ -1,97 +1,84 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth, db } from '../lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 
+// Interface de preferências de acessibilidade (sem síntese de voz)
 export interface AccessibilityPreferences {
   fontSize: 'normal' | 'large' | 'extra-large';
-  highContrast: boolean;
   spacing: 'normal' | 'wide';
-  simplifiedMode: boolean;
-  extraConfirmation: boolean;
-  reminderFrequency: 'none' | 'daily' | 'weekly';
-  enhancedFeedback: boolean;
+  highContrast: boolean;
+  extraConfirmation?: boolean;
+  simplifiedMode?: boolean;
+  reminderFrequency?: 'none' | 'daily' | 'weekly';
+  enhancedFeedback?: boolean;
+  reduceMotion?: boolean;
 }
 
-interface AccessibilityContextType {
+interface AccessibilityContextData {
   prefs: AccessibilityPreferences;
-  userName: string;
-  updatePrefs: (newPrefs: Partial<AccessibilityPreferences>) => Promise<void>;
-  loading: boolean;
+  setPrefs: React.Dispatch<React.SetStateAction<AccessibilityPreferences>>;
+  updatePrefs: (newPrefs: Partial<AccessibilityPreferences>) => void;
 }
 
-const defaultPrefs: AccessibilityPreferences = {
+const defaultPreferences: AccessibilityPreferences = {
   fontSize: 'normal',
-  highContrast: false,
   spacing: 'normal',
+  highContrast: false,
+  extraConfirmation: false,
   simplifiedMode: false,
-  extraConfirmation: true,
   reminderFrequency: 'none',
-  enhancedFeedback: true,
+  enhancedFeedback: false,
+  reduceMotion: false,
 };
 
-const AccessibilityContext = createContext<AccessibilityContextType | undefined>(undefined);
+const AccessibilityContext = createContext<AccessibilityContextData>({
+  prefs: defaultPreferences,
+  setPrefs: () => {},
+  updatePrefs: () => {},
+});
 
-export function AccessibilityProvider({ children }: { children: React.ReactNode }) {
-  const [prefs, setPrefs] = useState<AccessibilityPreferences>(defaultPrefs);
-  const [userName, setUserName] = useState('');
-  const [loading, setLoading] = useState(true);
+const STORAGE_KEY = '@seniorease/accessibility_prefs';
+
+export const AccessibilityProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [prefs, setPrefs] = useState<AccessibilityPreferences>(defaultPreferences);
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        const userRef = doc(db, 'users', user.uid);
-        const unsubscribeSnapshot = onSnapshot(userRef, (docSnap) => {
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            setUserName(data.name || 'Estudante');
-            if (data.preferences) {
-              setPrefs(data.preferences);
-            }
-          }
-          setLoading(false);
-        }, (error) => {
-          console.error("Erro ao sincronizar Firestore Mobile:", error);
-          setLoading(false);
-        });
-
-        return () => unsubscribeSnapshot();
-      } else {
-        setPrefs(defaultPrefs);
-        setUserName('');
-        setLoading(false);
-      }
-    });
-
-    return () => unsubscribeAuth();
-  }, []);
-
-  const updatePrefs = async (newPrefs: Partial<AccessibilityPreferences>) => {
-    const updated = { ...prefs, ...newPrefs };
-    setPrefs(updated);
-
-    const user = auth.currentUser;
-    if (user) {
+    if (typeof window !== 'undefined' && window.localStorage) {
       try {
-        const userRef = doc(db, 'users', user.uid);
-        await updateDoc(userRef, { preferences: updated });
-      } catch (error) {
-        console.error("Erro ao atualizar Firestore Mobile:", error);
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setPrefs((prev) => ({ ...prev, ...parsed }));
+        }
+      } catch (e) {
+        console.error('Erro ao carregar preferências de acessibilidade:', e);
       }
     }
+  }, []);
+
+  const updatePrefs = (newPrefs: Partial<AccessibilityPreferences>) => {
+    setPrefs((prev) => {
+      const updated = { ...prev, ...newPrefs };
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        } catch (e) {
+          console.error('Erro ao salvar preferências de acessibilidade:', e);
+        }
+      }
+      return updated;
+    });
   };
 
   return (
-    <AccessibilityContext.Provider value={{ prefs, userName, updatePrefs, loading }}>
+    <AccessibilityContext.Provider value={{ prefs, setPrefs, updatePrefs }}>
       {children}
     </AccessibilityContext.Provider>
   );
-}
+};
 
-export function useAccessibility() {
+export const useAccessibility = () => {
   const context = useContext(AccessibilityContext);
   if (!context) {
     throw new Error('useAccessibility deve ser usado dentro de um AccessibilityProvider');
   }
   return context;
-}
+};

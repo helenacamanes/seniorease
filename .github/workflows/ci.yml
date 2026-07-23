@@ -7,8 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  test-and-lint:
-    name: Testes e Lint
+  build-and-test:
+    name: Build, Lint e Testes
     runs-on: ubuntu-latest
 
     steps:
@@ -21,12 +21,14 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Instalar dependências (todos os workspaces)
-        run: npm install
+      - name: Instalar dependências
+        run: npm ci
 
-      - name: Rodar testes unitários (core-domain)
-        run: npm run test --workspace=@seniorease/domain
+      - name: Rodar Lint (Turborepo)
+        run: npx turbo lint
 
-      - name: Rodar lint do Web
-        run: npm run lint --workspace=seniorease-web
-        continue-on-error: true
+      - name: Rodar Testes (Turborepo)
+        run: npx turbo test
+
+      - name: Rodar Build (Turborepo)
+        run: npx turbo build

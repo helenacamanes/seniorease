@@ -3,7 +3,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import {
+  doc,
+  onSnapshot,
+  setDoc
+} from 'firebase/firestore';
 
 export interface AccessibilityPreferences {
   fontSize: 'normal' | 'large' | 'extra-large';
@@ -13,6 +17,7 @@ export interface AccessibilityPreferences {
   extraConfirmation: boolean;
   reminderFrequency: 'none' | 'daily' | 'weekly';
   enhancedFeedback: boolean;
+  reduceMotion: boolean;
 }
 
 interface AccessibilityContextType {
@@ -30,6 +35,7 @@ const defaultPrefs: AccessibilityPreferences = {
   extraConfirmation: true,
   reminderFrequency: 'none',
   enhancedFeedback: true,
+  reduceMotion: false
 };
 
 const AccessibilityContext = createContext<AccessibilityContextType | undefined>(undefined);
@@ -72,12 +78,20 @@ export function AccessibilityProvider({ children }: { children: React.ReactNode 
   const updatePrefs = async (newPrefs: Partial<AccessibilityPreferences>) => {
     const updated = { ...prefs, ...newPrefs };
     setPrefs(updated);
-    
+
     const user = auth.currentUser;
     if (user) {
       try {
         const userRef = doc(db, 'users', user.uid);
-        await updateDoc(userRef, { preferences: updated });
+        await setDoc(
+          userRef,
+          {
+            preferences: updated
+          },
+          {
+            merge: true
+          }
+        );
       } catch (error) {
         console.error("Erro ao salvar preferências no Firestore:", error);
       }

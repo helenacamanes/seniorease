@@ -21,13 +21,19 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
   const [guidedTask, setGuidedTask] = useState<Task | null>(null);
   const [guidedStepIndex, setGuidedStepIndex] = useState(0);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [taskPendingUndo, setTaskPendingUndo] = useState<Task | null>(null);
-  // 🌟 Modo Simplificado: começa com a seção de concluídas escondida,
-  // para reduzir a quantidade de informação na tela de uma vez.
-  const [showCompleted, setShowCompleted] = useState(!prefs.simplifiedMode);
 
-  // 🌟 Escuta as tarefas reais do usuário logado no Firestore
-  // (o mesmo caminho já usado pelo Mobile: users/{uid}/tasks)
+  const [taskPendingUndo, setTaskPendingUndo] = useState<Task | null>(null);
+  const [taskPendingComplete, setTaskPendingComplete] = useState<Task | null>(null);
+  const [taskToStartGuided, setTaskToStartGuided] = useState<Task | null>(null);
+  const [showConfirmCloseGuided, setShowConfirmCloseGuided] = useState(false);
+  const [showConfirmClearFilter, setShowConfirmClearFilter] = useState(false);
+  const [pendingToggleCompletedSection, setPendingToggleCompletedSection] = useState(false);
+
+  const [showCompleted, setShowCompleted] = useState(!prefs.simplifiedMode);
+  useEffect(() => {
+    setShowCompleted(!prefs.simplifiedMode);
+  }, [prefs.simplifiedMode]);
+
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (!user) {
@@ -89,17 +95,14 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
       const taskDocRef = doc(db, 'users', user.uid, 'tasks', taskId);
       await updateDoc(taskDocRef, {
         completed: !isCompleted,
-        // 🌟 Guarda quando a tarefa foi concluída, usado no Histórico.
         completedAt: !isCompleted ? new Date().toISOString() : null,
       });
 
       if (!isCompleted) {
-        // 🌟 Feedback Visual Reforçado: quando ligado, mostra um banner
-        // animado com ícone e cor de sucesso em vez de um alert() simples.
         if (prefs.enhancedFeedback) {
           setSuccessMessage('Muito bem! Atividade concluída!');
         } else {
-          alert('Parabéns! 🎉 Atividade concluída!');
+          alert('Muito bem! Atividade concluída!');
         }
       }
     } catch (error) {
@@ -109,18 +112,20 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
   };
 
   const toggleTask = (taskId: string, isCompleted: boolean) => {
-    // 🌟 Confirmação adicional antes de ação crítica: desfazer uma atividade
-    // já concluída apaga o registro dela do Histórico, então avisamos antes.
-    if (isCompleted && prefs.extraConfirmation) {
-      const task = tasks.find((t) => t.id === taskId) || null;
+    const task = tasks.find((t) => t.id === taskId) || null;
+    if (isCompleted) {
       setTaskPendingUndo(task);
-      return;
+    } else {
+      setTaskPendingComplete(task);
     }
-    performToggle(taskId, isCompleted);
   };
 
-  const openGuidedFlow = (task: Task) => {
+  const requestOpenGuidedFlow = (task: Task) => {
     if (task.completed) return;
+    setTaskToStartGuided(task);
+  };
+
+  const startGuidedFlow = (task: Task) => {
     setGuidedTask(task);
     setGuidedStepIndex(0);
   };
@@ -140,70 +145,77 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
 
   const guidedSteps = guidedTask ? GetGuidedSteps.execute(guidedTask) : [];
   const isLastGuidedStep = guidedStepIndex === guidedSteps.length - 1;
+  const transitionStyle = prefs.reduceMotion ? 'none' : 'all 0.2s ease-in-out';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-      {/* ALERTA DE FILTRO SELECIONADO NA DASHBOARD */}
       {activeCourseFilter && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px', backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px', backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '14px', transition: transitionStyle }}>
           <span style={{ fontSize: getFontSize('body'), color: theme.text }}>
             Mostrando tarefas de: <strong>{currentCourseName}</strong>
           </span>
-          <button onClick={onClearFilter} style={{ padding: '12px 24px', cursor: 'pointer', borderRadius: '10px', fontWeight: 'bold', border: `2px solid ${theme.borderColor}`, backgroundColor: theme.buttonClearBg, color: theme.buttonClearText, fontSize: getFontSize('body') }}>
-            📂 Mostrar Todas as Tarefas
+          <button
+            onClick={() => setShowConfirmClearFilter(true)}
+            style={{ padding: '12px 24px', cursor: 'pointer', borderRadius: '10px', fontWeight: 'bold', border: `3px solid ${theme.borderColor}`, backgroundColor: theme.buttonClearBg, color: theme.buttonClearText, fontSize: getFontSize('body'), transition: transitionStyle }}
+          >
+            Mostrar Todas as Tarefas
           </button>
         </div>
       )}
 
-      {/* ⏳ SEÇÃO: EM ANDAMENTO */}
-      <h2 style={{ fontSize: getFontSize('title'), color: theme.text, margin: 0 }}>⏳ Atividades para Fazer ({activeTasks.length})</h2>
+      <h2 style={{ fontSize: getFontSize('title'), color: theme.text, margin: 0 }}>
+        Atividades para Fazer ({activeTasks.length})
+      </h2>
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {activeTasks.length === 0 ? (
-          <p style={{ color: theme.textMuted, fontStyle: 'italic', fontSize: getFontSize('body') }}>Nenhuma tarefa pendente! Excelente.</p>
+          <p style={{ color: theme.textMuted, fontStyle: 'italic', fontSize: getFontSize('body') }}>Nenhuma tarefa pendente.</p>
         ) : (
           activeTasks.map((task) => (
-            <div key={task.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '14px', padding: prefs.spacing === 'wide' ? '24px' : '16px' }}>
-              <div onClick={() => openGuidedFlow(task)} style={{ cursor: 'pointer', flex: 1 }}>
+            <div key={task.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '14px', padding: prefs.spacing === 'wide' ? '24px' : '16px', transition: transitionStyle }}>
+              <div onClick={() => requestOpenGuidedFlow(task)} style={{ cursor: 'pointer', flex: 1 }}>
                 <span style={{ fontSize: getFontSize('body'), fontWeight: 'bold', color: theme.text, display: 'block' }}>{task.title}</span>
                 {!prefs.simplifiedMode && !activeCourseFilter && task.courseName && (
                   <span style={{ color: theme.textMuted, fontSize: '13px', fontWeight: 'bold' }}>{task.courseName}</span>
                 )}
                 <span style={{ color: theme.textMuted, fontSize: '13px' }}>Clique para ver o passo a passo</span>
               </div>
-              <button onClick={() => toggleTask(task.id, task.completed)} style={{ padding: '12px 20px', cursor: 'pointer', borderRadius: '8px', border: `2px solid ${theme.borderColor}`, backgroundColor: theme.buttonClearBg, color: theme.text, fontSize: getFontSize('body') }}>
-                ⬜ Marcar como Feita
+              <button onClick={() => toggleTask(task.id, task.completed)} style={{ padding: '12px 20px', cursor: 'pointer', borderRadius: '8px', border: `2px solid ${theme.borderColor}`, backgroundColor: theme.buttonClearBg, color: theme.text, fontSize: getFontSize('body'), transition: transitionStyle }}>
+                Marcar como Feita
               </button>
             </div>
           ))
         )}
       </div>
 
-      {/* ✅ SEÇÃO: CONCLUÍDAS (recolhível para reduzir informação na tela) */}
-      <button
-        onClick={() => setShowCompleted((prev) => !prev)}
-        style={{ alignSelf: 'flex-start', padding: '10px 18px', borderRadius: '10px', border: `2px solid ${theme.borderColor}`, backgroundColor: theme.buttonClearBg, color: theme.text, fontWeight: 'bold', cursor: 'pointer', fontSize: getFontSize('body') }}
-      >
-        {showCompleted ? '🔽' : '▶️'} Concluídas ({finishedTasks.length})
-      </button>
+      {!prefs.simplifiedMode && (
+        <button
+          onClick={() =>
+            setPendingToggleCompletedSection(true)
+          }
+          style={{ alignSelf: 'flex-start', padding: '10px 18px', borderRadius: '10px', border: `2px solid ${theme.borderColor}`, backgroundColor: theme.buttonClearBg, color: theme.text, fontWeight: 'bold', cursor: 'pointer', fontSize: getFontSize('body'), transition: transitionStyle }}
+        >
+          {showCompleted ? 'Ocultar Concluídas' : 'Mostrar Concluídas'} ({finishedTasks.length})
+        </button>)}
 
-      {showCompleted && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {finishedTasks.map((task) => (
-            <div key={task.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '14px', padding: prefs.spacing === 'wide' ? '24px' : '16px', opacity: 0.75 }}>
-              <span style={{ fontSize: getFontSize('body'), color: theme.text, textDecoration: 'line-through', display: 'block' }}>{task.title}</span>
-              <button onClick={() => toggleTask(task.id, task.completed)} style={{ padding: '12px 20px', cursor: 'pointer', borderRadius: '8px', border: 'transparent', backgroundColor: theme.buttonActiveBg, color: '#ffffff', fontWeight: 'bold', fontSize: getFontSize('body') }}>
-                💚 Concluída! (Refazer)
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      {showCompleted &&
+        !prefs.simplifiedMode && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {finishedTasks.map((task) => (
+              <div key={task.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '14px', padding: prefs.spacing === 'wide' ? '24px' : '16px', opacity: 0.75, transition: transitionStyle }}>
+                <span style={{ fontSize: getFontSize('body'), color: theme.text, textDecoration: 'line-through', display: 'block' }}>{task.title}</span>
+                <button onClick={() => toggleTask(task.id, task.completed)} style={{ padding: '12px 20px', cursor: 'pointer', borderRadius: '8px', border: 'transparent', backgroundColor: theme.buttonActiveBg, color: '#ffffff', fontWeight: 'bold', fontSize: getFontSize('body'), transition: transitionStyle }}>
+                  Concluída (Refazer)
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
-      {/* 🌟 FLUXO GUIADO PASSO A PASSO */}
       {guidedTask && (
-        <div onClick={closeGuidedFlow} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: theme.card, border: `4px solid ${theme.borderColor}`, borderRadius: '24px', padding: '32px', width: '90%', maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div onClick={() => setShowConfirmCloseGuided(true)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: theme.card, border: `4px solid ${theme.borderColor}`, borderRadius: '24px', padding: '32px', width: '90%', maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '16px', transition: transitionStyle }}>
             <h3 style={{ fontSize: getFontSize('title'), color: theme.text, margin: 0, textAlign: 'center' }}>{guidedTask.title}</h3>
             <p style={{ textAlign: 'center', color: theme.textMuted, fontWeight: 'bold', fontSize: getFontSize('body'), margin: 0 }}>
               Passo {guidedStepIndex + 1} de {guidedSteps.length}
@@ -216,40 +228,59 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
             </div>
 
             {isLastGuidedStep ? (
-              <button onClick={() => { toggleTask(guidedTask.id, guidedTask.completed); closeGuidedFlow(); }} style={{ padding: '16px', cursor: 'pointer', borderRadius: '12px', border: 'none', backgroundColor: theme.buttonActiveBg, color: '#ffffff', fontWeight: 'bold', fontSize: getFontSize('body') }}>
-                ✨ Concluir Atividade!
+              <button onClick={() => toggleTask(guidedTask.id, guidedTask.completed)} style={{ padding: '16px', cursor: 'pointer', borderRadius: '12px', border: 'none', backgroundColor: theme.buttonActiveBg, color: '#ffffff', fontWeight: 'bold', fontSize: getFontSize('body'), transition: transitionStyle }}>
+                Concluir Atividade
               </button>
             ) : (
-              <button onClick={() => setGuidedStepIndex((i) => i + 1)} style={{ padding: '16px', cursor: 'pointer', borderRadius: '12px', border: 'none', backgroundColor: theme.buttonActiveBg, color: '#ffffff', fontWeight: 'bold', fontSize: getFontSize('body') }}>
-                Avançar Passo ➔
+              <button
+                onClick={() =>
+                  setGuidedStepIndex((i) => i + 1)
+                }
+                style={{ padding: '16px', cursor: 'pointer', borderRadius: '12px', border: 'none', backgroundColor: theme.buttonActiveBg, color: '#ffffff', fontWeight: 'bold', fontSize: getFontSize('body'), transition: transitionStyle }}>
+                Avançar Passo
               </button>
             )}
 
             {guidedStepIndex > 0 && (
-              <button onClick={() => setGuidedStepIndex((i) => i - 1)} style={{ padding: '12px', cursor: 'pointer', borderRadius: '12px', border: `2px solid ${theme.borderColor}`, backgroundColor: 'transparent', color: theme.text, fontWeight: 'bold', fontSize: getFontSize('body') }}>
-                ⬅️ Passo Anterior
+              <button
+                onClick={() =>
+                  setGuidedStepIndex((i) => i - 1)
+                } style={{ padding: '12px', cursor: 'pointer', borderRadius: '12px', border: `2px solid ${theme.borderColor}`, backgroundColor: 'transparent', color: theme.text, fontWeight: 'bold', fontSize: getFontSize('body'), transition: transitionStyle }}>
+                Passo Anterior
               </button>
             )}
 
-            <button onClick={closeGuidedFlow} style={{ padding: '12px', cursor: 'pointer', borderRadius: '12px', border: `2px solid ${theme.borderColor}`, backgroundColor: 'transparent', color: theme.text, fontWeight: 'bold', fontSize: getFontSize('body') }}>
+            <button onClick={() => setShowConfirmCloseGuided(true)} style={{ padding: '12px', cursor: 'pointer', borderRadius: '12px', border: `2px solid ${theme.borderColor}`, backgroundColor: 'transparent', color: theme.text, fontWeight: 'bold', fontSize: getFontSize('body'), transition: transitionStyle }}>
               Parar e Sair
             </button>
           </div>
         </div>
       )}
 
-      {/* 🌟 FEEDBACK VISUAL REFORÇADO */}
       <SuccessToast
         visible={!!successMessage}
         message={successMessage || ''}
         onDismiss={() => setSuccessMessage(null)}
       />
 
-      {/* 🌟 CONFIRMAÇÃO VISUAL ANTES DE DESFAZER UMA ATIVIDADE CONCLUÍDA */}
+      <ConfirmDialog
+        visible={!!taskPendingComplete}
+        title="Concluir Atividade?"
+        message={`Deseja confirmar a conclusão da atividade "${taskPendingComplete?.title}"?`}
+        confirmLabel="Sim, concluir"
+        cancelLabel="Cancelar"
+        onConfirm={() => {
+          if (taskPendingComplete) performToggle(taskPendingComplete.id, taskPendingComplete.completed);
+          setTaskPendingComplete(null);
+          if (guidedTask) closeGuidedFlow();
+        }}
+        onCancel={() => setTaskPendingComplete(null)}
+      />
+
       <ConfirmDialog
         visible={!!taskPendingUndo}
         title="Desfazer atividade concluída?"
-        message='Essa atividade vai voltar para "pendente" e sair do seu Histórico. Deseja continuar?'
+        message={`Deseja retornar a atividade "${taskPendingUndo?.title}" para pendente?`}
         confirmLabel="Sim, desfazer"
         cancelLabel="Cancelar"
         destructive
@@ -258,6 +289,58 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
           setTaskPendingUndo(null);
         }}
         onCancel={() => setTaskPendingUndo(null)}
+      />
+
+      <ConfirmDialog
+        visible={!!taskToStartGuided}
+        title="Iniciar Passo a Passo?"
+        message={`Deseja abrir o modo guiado para a atividade "${taskToStartGuided?.title}"?`}
+        confirmLabel="Sim, iniciar"
+        cancelLabel="Cancelar"
+        onConfirm={() => {
+          if (taskToStartGuided) startGuidedFlow(taskToStartGuided);
+          setTaskToStartGuided(null);
+        }}
+        onCancel={() => setTaskToStartGuided(null)}
+      />
+
+      <ConfirmDialog
+        visible={showConfirmCloseGuided}
+        title="Sair do Passo a Passo?"
+        message="Se você sair agora, seu progresso visual nesta tarefa não será salvo até que você a conclua."
+        confirmLabel="Sim, sair"
+        cancelLabel="Continuar estudando"
+        destructive
+        onConfirm={() => {
+          setShowConfirmCloseGuided(false);
+          closeGuidedFlow();
+        }}
+        onCancel={() => setShowConfirmCloseGuided(false)}
+      />
+
+      <ConfirmDialog
+        visible={showConfirmClearFilter}
+        title="Mostrar Todas as Tarefas?"
+        message="Deseja remover o filtro atual e visualizar a lista completa de atividades?"
+        confirmLabel="Sim, mostrar todas"
+        cancelLabel="Cancelar"
+        onConfirm={() => {
+          setShowConfirmClearFilter(false);
+          onClearFilter();
+        }}
+        onCancel={() => setShowConfirmClearFilter(false)}
+      />
+      <ConfirmDialog
+        visible={pendingToggleCompletedSection}
+        title={showCompleted ? "Ocultar Tarefas Concluídas?" : "Mostrar Tarefas Concluídas?"}
+        message={showCompleted ? "Deseja ocultar a lista de tarefas concluídas?" : "Deseja exibir a lista de tarefas concluídas?"}
+        confirmLabel="Sim, confirmar"
+        cancelLabel="Cancelar"
+        onConfirm={() => {
+          setShowCompleted((prev) => !prev);
+          setPendingToggleCompletedSection(false);
+        }}
+        onCancel={() => setPendingToggleCompletedSection(false)}
       />
     </div>
   );

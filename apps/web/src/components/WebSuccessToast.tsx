@@ -45,9 +45,14 @@ export default function SuccessToast({ visible, message, onDismiss }: SuccessToa
         position: 'fixed',
         top: '32px',
         left: '50%',
-        transform: `translateX(-50%) translateY(${show ? '0' : '-30px'})`,
         opacity: show ? 1 : 0,
-        transition: 'transform 0.3s ease, opacity 0.3s ease',
+        transition: prefs.reduceMotion
+          ? 'none'
+          : 'transform 0.3s ease, opacity 0.3s ease',
+
+        transform: prefs.reduceMotion
+          ? 'translateX(-50%)'
+          : `translateX(-50%) translateY(${show ? '0' : '-30px'})`,
         zIndex: 2000,
         display: 'flex',
         alignItems: 'center',

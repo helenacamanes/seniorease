@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { db, auth } from '../lib/firebase'; // 🌟 Importa o db e auth locais do mobile
+import { db, auth } from '../lib/firebase';
 import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { useAccessibility } from '../context/AccessibilityContext';
 import { Header } from '../components/Header';
@@ -9,6 +9,7 @@ import { SuccessFeedback } from '../components/SuccessFeedback';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { GetGuidedSteps, Task } from '@seniorease/domain';
 
+
 export default function TasksScreen() {
   const { prefs } = useAccessibility();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -16,17 +17,33 @@ export default function TasksScreen() {
   const [guidedTask, setGuidedTask] = useState<Task | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [taskPendingUndo, setTaskPendingUndo] = useState<Task | null>(null);
-  // 🌟 Modo Simplificado: começa escondendo as tarefas já concluídas,
-  // para reduzir a quantidade de informação na tela.
+  const [taskPendingComplete, setTaskPendingComplete] = useState<Task | null>(null);
   const [showCompleted, setShowCompleted] = useState(!prefs.simplifiedMode);
-
+  useEffect(() => {
+    setShowCompleted(!prefs.simplifiedMode);
+  }, [prefs.simplifiedMode]);
   const userId = auth.currentUser?.uid;
+  const [showLeaveGuide, setShowLeaveGuide] =
+    useState(false);
 
-  const getFontSize = (type: 'title' | 'body' | 'button') => {
-    const modifier = prefs.fontSize === 'extra-large' ? 6 : prefs.fontSize === 'large' ? 3 : 0;
-    if (type === 'title') return 24 + modifier;
-    if (type === 'button') return 18 + modifier;
-    return 20 + modifier;
+  const getFontSize = (baseSize: number | 'body' | 'button') => {
+    const sizeMap: Record<'body' | 'button', number> = {
+      body: 16,
+      button: 15,
+    };
+    const resolvedSize = typeof baseSize === 'number' ? baseSize : sizeMap[baseSize];
+
+    switch (prefs.fontSize) {
+      case 'large':
+        return resolvedSize * 1.25;
+      case 'extra-large':
+        return resolvedSize * 1.5;
+      default:
+        return resolvedSize;
+    }
+  };
+  const getSpacing = (baseSpacing: number) => {
+    return prefs.spacing === 'wide' ? baseSpacing * 1.5 : baseSpacing;
   };
 
   const theme = {
@@ -48,7 +65,6 @@ export default function TasksScreen() {
 
     const tasksRef = collection(db, 'users', userId, 'tasks');
 
-    // Escuta o banco de dados em tempo real. Se mudar na Web, muda no Mobile na hora!
     const unsubscribe = onSnapshot(tasksRef, (snapshot) => {
       const tasksList: Task[] = [];
       snapshot.forEach((docSnap) => {
@@ -71,19 +87,17 @@ export default function TasksScreen() {
       const taskDocRef = doc(db, 'users', userId, 'tasks', taskId);
       await updateDoc(taskDocRef, {
         completed: !currentStatus,
-        // 🌟 Guarda quando a tarefa foi concluída, usado no Histórico.
-        // Ao "desfazer", limpamos a data para não aparecer no histórico.
         completedAt: !currentStatus ? new Date().toISOString() : null,
       });
 
       if (!currentStatus) {
-        // 🌟 Feedback Visual Reforçado: quando ligado, mostra um overlay
-        // animado em vez de só um alerta de texto simples.
         if (prefs.enhancedFeedback) {
           setSuccessMessage('Muito bem! Atividade concluída!');
         } else {
           Alert.alert("Muito bem! 🎉", "Você concluiu mais uma atividade com sucesso!");
         }
+      } else {
+        Alert.alert("Atividade retornada para a lista de pendentes.");
       }
     } catch (error) {
       console.error("Erro ao alterar status da tarefa:", error);
@@ -92,18 +106,24 @@ export default function TasksScreen() {
   };
 
   const handleToggleTask = (taskId: string, currentStatus: boolean) => {
-    // 🌟 Confirmação adicional antes de ação crítica: desfazer uma atividade
-    // já concluída apaga o registro dela do Histórico, então avisamos antes.
-    if (currentStatus && prefs.extraConfirmation) {
-      const task = tasks.find((t) => t.id === taskId) || null;
-      setTaskPendingUndo(task);
+    const task = tasks.find((t) => t.id === taskId) || null;
+
+    if (prefs.extraConfirmation) {
+      if (currentStatus) {
+        setTaskPendingUndo(task);
+        Alert.alert("Confirme se deseja desfazer esta atividade.");
+      } else {
+        setTaskPendingComplete(task);
+        Alert.alert("Confirme se deseja concluir esta atividade.");
+      }
       return;
     }
+
     performToggle(taskId, currentStatus);
   };
 
   const openGuidedFlow = (task: Task) => {
-    if (task.completed) return; // fluxo guiado só faz sentido para quem ainda vai fazer a tarefa
+    if (task.completed) return;
     setGuidedTask(task);
   };
 
@@ -142,14 +162,16 @@ export default function TasksScreen() {
             }
             renderItem={({ item }) => (
               <TouchableOpacity
-                activeOpacity={0.8}
+                activeOpacity={prefs.reduceMotion ? 1 : 0.8}
                 onPress={() => openGuidedFlow(item)}
-                style={[styles.taskCard, { backgroundColor: theme.card, borderColor: theme.border, padding: prefs.spacing === 'wide' ? 24 : 20 }]}
+                style={[
+                  styles.taskCard,
+                  { backgroundColor: theme.card, borderColor: theme.border, padding: prefs.spacing === 'wide' ? 24 : 20 }
+                ]}
               >
                 <Text style={[styles.taskTitle, { fontSize: getFontSize('body'), color: theme.text }]}>
                   {item.title}
                 </Text>
-                {/* 🌟 Modo Simplificado: esconde a categoria para reduzir informação na tela */}
                 {!prefs.simplifiedMode && item.category && (
                   <Text style={{ fontSize: getFontSize('body') - 4, color: theme.textMuted, marginBottom: 12 }}>
                     {item.category}
@@ -172,7 +194,8 @@ export default function TasksScreen() {
               </TouchableOpacity>
             )}
             ListFooterComponent={
-              completedTasks.length > 0 ? (
+              completedTasks.length > 0 &&
+                !prefs.simplifiedMode ? (
                 <View style={{ marginTop: prefs.spacing === 'wide' ? 24 : 16 }}>
                   <TouchableOpacity
                     onPress={() => setShowCompleted((prev) => !prev)}
@@ -208,11 +231,18 @@ export default function TasksScreen() {
         )}
       </View>
 
-      {/* 🌟 FLUXO GUIADO PASSO A PASSO */}
+      {/* FLUXO GUIADO PASSO A PASSO */}
       {guidedTask && (
         <GuidedTaskModal
           task={{ title: guidedTask.title, steps: GetGuidedSteps.execute(guidedTask) }}
-          onClose={() => setGuidedTask(null)}
+          onClose={() => {
+            if (prefs.extraConfirmation) {
+              setShowLeaveGuide(true);
+              return;
+            }
+
+            setGuidedTask(null);
+          }}
           onComplete={() => {
             handleToggleTask(guidedTask.id, guidedTask.completed);
             setGuidedTask(null);
@@ -220,14 +250,26 @@ export default function TasksScreen() {
         />
       )}
 
-      {/* 🌟 FEEDBACK VISUAL REFORÇADO */}
+      {/* FEEDBACK VISUAL REFORÇADO */}
       <SuccessFeedback
         visible={!!successMessage}
         message={successMessage || ''}
         onDismiss={() => setSuccessMessage(null)}
       />
 
-      {/* 🌟 CONFIRMAÇÃO VISUAL ANTES DE DESFAZER UMA ATIVIDADE CONCLUÍDA */}
+      {/* CONFIRMAÇÃO VISUAL ANTES DE CONCLUIR TAREFA */}
+      <ConfirmDialog
+        visible={!!taskPendingComplete}
+        title="Concluir Atividade?"
+        message={`Deseja confirmar a conclusão da atividade "${taskPendingComplete?.title}"?`}
+        confirmLabel="Sim, concluir"
+        cancelLabel="Cancelar"
+        onConfirm={() => {
+          if (taskPendingComplete) performToggle(taskPendingComplete.id, taskPendingComplete.completed);
+          setTaskPendingComplete(null);
+        }}
+        onCancel={() => setTaskPendingComplete(null)}
+      />
       <ConfirmDialog
         visible={!!taskPendingUndo}
         title="Desfazer atividade concluída?"
@@ -240,6 +282,22 @@ export default function TasksScreen() {
           setTaskPendingUndo(null);
         }}
         onCancel={() => setTaskPendingUndo(null)}
+      />
+      <ConfirmDialog
+        visible={showLeaveGuide}
+        title="Sair da atividade?"
+        message="Seu progresso não será salvo. Deseja sair?"
+        confirmLabel="Sair"
+        cancelLabel="Continuar"
+
+        onConfirm={() => {
+          setGuidedTask(null);
+          setShowLeaveGuide(false);
+        }}
+
+        onCancel={() =>
+          setShowLeaveGuide(false)
+        }
       />
     </View>
   );
