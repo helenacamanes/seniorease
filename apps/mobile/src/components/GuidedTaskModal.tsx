@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Modal } from 'react-native';
 import { useAccessibility } from '../context/AccessibilityContext';
 import { AccessibleButton } from './AccessibleButton';
+import { SuccessFeedback } from './SuccessFeedback';
 
 interface GuidedTaskModalProps {
   task: { title: string; steps: string[] };
@@ -12,6 +13,7 @@ interface GuidedTaskModalProps {
 export function GuidedTaskModal({ task, onClose, onComplete }: GuidedTaskModalProps) {
   const { prefs } = useAccessibility();
   const [currentStep, setCurrentStep] = useState(0);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const getFontSize = (type: 'title' | 'body') => {
     const isLarge = prefs.fontSize === 'large';
@@ -28,6 +30,19 @@ export function GuidedTaskModal({ task, onClose, onComplete }: GuidedTaskModalPr
   };
 
   const isLastStep = currentStep === task.steps.length - 1;
+
+  const handleFinish = () => {
+    if (prefs.enhancedFeedback) {
+      setShowSuccess(true);
+    } else {
+      onComplete();
+    }
+  };
+
+  const handleDismissSuccess = () => {
+    setShowSuccess(false);
+    onComplete();
+  };
 
   return (
     <Modal visible={true} animationType="slide" transparent={true}>
@@ -51,7 +66,7 @@ export function GuidedTaskModal({ task, onClose, onComplete }: GuidedTaskModalPr
 
           <View style={{ gap: 12, width: '100%' }}>
             {isLastStep ? (
-              <AccessibleButton title="✨ Concluir Atividade!" onPress={onComplete} />
+              <AccessibleButton title="✨ Concluir Atividade!" onPress={handleFinish} />
             ) : (
               <AccessibleButton title="Avançar Passo ➔" onPress={() => setCurrentStep(prev => prev + 1)} />
             )}
@@ -64,6 +79,12 @@ export function GuidedTaskModal({ task, onClose, onComplete }: GuidedTaskModalPr
           </View>
 
         </View>
+
+        <SuccessFeedback
+          visible={showSuccess}
+          message="Parabéns! Atividade concluída com sucesso!"
+          onDismiss={handleDismissSuccess}
+        />
       </View>
     </Modal>
   );

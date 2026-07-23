@@ -6,3 +6,4 @@ export * from './use-cases/UserDataInitializer';
 export * from './use-cases/CalculateProgress';
 export * from './use-cases/GetGuidedSteps';
 export * from './use-cases/TaskHistory';
+export * from './use-cases/GetCourseWithTasks';

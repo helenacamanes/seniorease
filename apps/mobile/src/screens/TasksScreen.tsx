@@ -1,36 +1,118 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { db, auth } from '../lib/firebase';
-import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useAccessibility } from '../context/AccessibilityContext';
 import { Header } from '../components/Header';
 import { GuidedTaskModal } from '../components/GuidedTaskModal';
 import { SuccessFeedback } from '../components/SuccessFeedback';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { GetGuidedSteps, Task } from '@seniorease/domain';
+import { GetCourseWithTasks, Course, TaskItem } from '@seniorease/domain';
 
+interface TasksScreenProps {
+  courseId?: string;
+}
 
-export default function TasksScreen() {
+export default function TasksScreen({ courseId = 'smartphone-whatsapp' }: TasksScreenProps) {
   const { prefs } = useAccessibility();
-  const [tasks, setTasks] = useState<Task[]>([]);
+  
+  // Dados do Curso vindo do Firestore
+  const [course, setCourse] = useState<Course | null>(null);
+  const [userProgress, setUserProgress] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
-  const [guidedTask, setGuidedTask] = useState<Task | null>(null);
+
+  // Modais e Feedbacks
+  const [guidedTask, setGuidedTask] = useState<TaskItem | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [taskPendingUndo, setTaskPendingUndo] = useState<Task | null>(null);
-  const [taskPendingComplete, setTaskPendingComplete] = useState<Task | null>(null);
+  const [taskPendingUndo, setTaskPendingUndo] = useState<TaskItem | null>(null);
+  const [taskPendingComplete, setTaskPendingComplete] = useState<TaskItem | null>(null);
   const [showCompleted, setShowCompleted] = useState(!prefs.simplifiedMode);
+  const [showLeaveGuide, setShowLeaveGuide] = useState(false);
+
+  const userId = auth.currentUser?.uid;
+
   useEffect(() => {
     setShowCompleted(!prefs.simplifiedMode);
   }, [prefs.simplifiedMode]);
-  const userId = auth.currentUser?.uid;
-  const [showLeaveGuide, setShowLeaveGuide] =
-    useState(false);
+
+  // Carrega os dados do Curso + Progresso de Conclusão do Usuário
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setLoading(true);
+
+        // 1. Busca os dados do curso e tarefas via Core Domain UseCase
+        const useCase = new GetCourseWithTasks(db);
+        const courseData = await useCase.execute(courseId);
+        setCourse(courseData);
+
+        // 2. Busca o progresso de tarefas concluídas pelo usuário
+        if (userId && courseData) {
+          const progressRef = doc(db, 'users', userId, 'courses_progress', courseId);
+          const progressSnap = await getDoc(progressRef);
+          if (progressSnap.exists()) {
+            setUserProgress(progressSnap.data() || {});
+          }
+        }
+      } catch (error) {
+        console.error("Erro ao carregar curso e progresso:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadData();
+  }, [courseId, userId]);
+
+  // Função para alternar o status da tarefa (Marcar/Desfazer)
+  const performToggle = async (task: TaskItem) => {
+    if (!userId) return;
+
+    const currentStatus = !!userProgress[task.title];
+    const newStatus = !currentStatus;
+
+    try {
+      const updatedProgress = { ...userProgress, [task.title]: newStatus };
+      setUserProgress(updatedProgress);
+
+      // Persiste o progresso do curso para o usuário no Firestore
+      const progressRef = doc(db, 'users', userId, 'courses_progress', courseId);
+      await setDoc(progressRef, updatedProgress, { merge: true });
+
+      if (newStatus) {
+        if (prefs.enhancedFeedback) {
+          setSuccessMessage('Muito bem! Atividade concluída!');
+        } else {
+          Alert.alert("Muito bem! 🎉", "Você concluiu mais uma atividade com sucesso!");
+        }
+      } else {
+        Alert.alert("Atividade retornada para a lista de pendentes.");
+      }
+    } catch (error) {
+      console.error("Erro ao salvar progresso da tarefa:", error);
+      Alert.alert("Ops!", "Não foi possível salvar seu progresso. Verifique a conexão.");
+    } finally {
+      setGuidedTask(null);
+    }
+  };
+
+  const handleToggleTask = (task: TaskItem) => {
+    const isCompleted = !!userProgress[task.title];
+
+    if (prefs.extraConfirmation) {
+      if (isCompleted) {
+        setTaskPendingUndo(task);
+      } else {
+        setTaskPendingComplete(task);
+      }
+      return;
+    }
+
+    performToggle(task);
+  };
 
   const getFontSize = (baseSize: number | 'body' | 'button') => {
-    const sizeMap: Record<'body' | 'button', number> = {
-      body: 16,
-      button: 15,
-    };
+    const sizeMap: Record<'body' | 'button', number> = { body: 16, button: 15 };
     const resolvedSize = typeof baseSize === 'number' ? baseSize : sizeMap[baseSize];
 
     switch (prefs.fontSize) {
@@ -41,9 +123,6 @@ export default function TasksScreen() {
       default:
         return resolvedSize;
     }
-  };
-  const getSpacing = (baseSpacing: number) => {
-    return prefs.spacing === 'wide' ? baseSpacing * 1.5 : baseSpacing;
   };
 
   const theme = {
@@ -57,113 +136,46 @@ export default function TasksScreen() {
     btnText: prefs.highContrast ? '#ffff00' : '#ffffff',
   };
 
-  useEffect(() => {
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
-
-    const tasksRef = collection(db, 'users', userId, 'tasks');
-
-    const unsubscribe = onSnapshot(tasksRef, (snapshot) => {
-      const tasksList: Task[] = [];
-      snapshot.forEach((docSnap) => {
-        tasksList.push({ id: docSnap.id, ...docSnap.data() } as Task);
-      });
-      setTasks(tasksList);
-      setLoading(false);
-    }, (error) => {
-      console.error("Erro ao carregar tarefas no mobile:", error);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [userId]);
-
-  const performToggle = async (taskId: string, currentStatus: boolean) => {
-    if (!userId) return;
-
-    try {
-      const taskDocRef = doc(db, 'users', userId, 'tasks', taskId);
-      await updateDoc(taskDocRef, {
-        completed: !currentStatus,
-        completedAt: !currentStatus ? new Date().toISOString() : null,
-      });
-
-      if (!currentStatus) {
-        if (prefs.enhancedFeedback) {
-          setSuccessMessage('Muito bem! Atividade concluída!');
-        } else {
-          Alert.alert("Muito bem! 🎉", "Você concluiu mais uma atividade com sucesso!");
-        }
-      } else {
-        Alert.alert("Atividade retornada para a lista de pendentes.");
-      }
-    } catch (error) {
-      console.error("Erro ao alterar status da tarefa:", error);
-      Alert.alert("Ops!", "Não foi possível salvar o seu progresso. Verifique sua internet.");
-    }
-  };
-
-  const handleToggleTask = (taskId: string, currentStatus: boolean) => {
-    const task = tasks.find((t) => t.id === taskId) || null;
-
-    if (prefs.extraConfirmation) {
-      if (currentStatus) {
-        setTaskPendingUndo(task);
-        Alert.alert("Confirme se deseja desfazer esta atividade.");
-      } else {
-        setTaskPendingComplete(task);
-        Alert.alert("Confirme se deseja concluir esta atividade.");
-      }
-      return;
-    }
-
-    performToggle(taskId, currentStatus);
-  };
-
-  const openGuidedFlow = (task: Task) => {
-    if (task.completed) return;
-    setGuidedTask(task);
-  };
-
-  const pendingTasks = tasks.filter((t) => !t.completed);
-  const completedTasks = tasks.filter((t) => t.completed);
-
   if (loading) {
     return (
       <View style={[styles.center, { backgroundColor: theme.bg }]}>
         <ActivityIndicator size="large" color={prefs.highContrast ? '#ffff00' : '#2563eb'} />
-        <Text style={{ fontSize: getFontSize('body'), marginTop: 10, color: theme.text }}>Buscando suas atividades...</Text>
+        <Text style={{ fontSize: getFontSize('body'), marginTop: 10, color: theme.text }}>
+          Buscando suas atividades...
+        </Text>
       </View>
     );
   }
 
+  const allTasks = course?.tasks || [];
+  const pendingTasks = allTasks.filter((t) => !userProgress[t.title]);
+  const completedTasks = allTasks.filter((t) => !!userProgress[t.title]);
+
   return (
     <View style={[styles.container, { backgroundColor: theme.bg }]}>
-      <Header title="Minhas Atividades 📋" />
+      <Header title={course?.name || "Minhas Atividades 📋"} />
 
       <View style={{ padding: prefs.spacing === 'wide' ? 24 : 16, flex: 1 }}>
-        {tasks.length === 0 ? (
+        {allTasks.length === 0 ? (
           <View style={styles.center}>
             <Text style={{ fontSize: getFontSize('body'), textAlign: 'center', color: theme.text }}>
-              Nenhuma tarefa encontrada para o seu curso.
+              Nenhuma tarefa encontrada para este curso.
             </Text>
           </View>
         ) : (
           <FlatList
             data={pendingTasks}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item.title}
             ItemSeparatorComponent={() => <View style={{ height: prefs.spacing === 'wide' ? 16 : 8 }} />}
             ListEmptyComponent={
-              <Text style={{ fontSize: getFontSize('body'), color: theme.textMuted, fontStyle: 'italic' }}>
+              <Text style={{ fontSize: getFontSize('body'), color: theme.textMuted, fontStyle: 'italic', textAlign: 'center', marginVertical: 20 }}>
                 Nenhuma tarefa pendente! Excelente. 🎉
               </Text>
             }
             renderItem={({ item }) => (
               <TouchableOpacity
                 activeOpacity={prefs.reduceMotion ? 1 : 0.8}
-                onPress={() => openGuidedFlow(item)}
+                onPress={() => setGuidedTask(item)}
                 style={[
                   styles.taskCard,
                   { backgroundColor: theme.card, borderColor: theme.border, padding: prefs.spacing === 'wide' ? 24 : 20 }
@@ -172,6 +184,7 @@ export default function TasksScreen() {
                 <Text style={[styles.taskTitle, { fontSize: getFontSize('body'), color: theme.text }]}>
                   {item.title}
                 </Text>
+
                 {!prefs.simplifiedMode && item.category && (
                   <Text style={{ fontSize: getFontSize('body') - 4, color: theme.textMuted, marginBottom: 12 }}>
                     {item.category}
@@ -180,7 +193,7 @@ export default function TasksScreen() {
 
                 <TouchableOpacity
                   style={[styles.button, { backgroundColor: theme.btnPending }]}
-                  onPress={() => handleToggleTask(item.id, item.completed)}
+                  onPress={() => handleToggleTask(item)}
                   accessibilityRole="button"
                   accessibilityLabel={`Marcar ${item.title} como concluída`}
                 >
@@ -188,14 +201,14 @@ export default function TasksScreen() {
                     Marcar como Pronto
                   </Text>
                 </TouchableOpacity>
+
                 <Text style={{ fontSize: getFontSize('body') - 5, color: theme.textMuted, textAlign: 'center', marginTop: 8 }}>
                   Toque na atividade para ver o passo a passo
                 </Text>
               </TouchableOpacity>
             )}
             ListFooterComponent={
-              completedTasks.length > 0 &&
-                !prefs.simplifiedMode ? (
+              completedTasks.length > 0 && !prefs.simplifiedMode ? (
                 <View style={{ marginTop: prefs.spacing === 'wide' ? 24 : 16 }}>
                   <TouchableOpacity
                     onPress={() => setShowCompleted((prev) => !prev)}
@@ -207,23 +220,41 @@ export default function TasksScreen() {
                     </Text>
                   </TouchableOpacity>
 
-                  {showCompleted && completedTasks.map((item) => (
-                    <View key={item.id} style={[styles.taskCard, { backgroundColor: theme.card, borderColor: theme.border, padding: prefs.spacing === 'wide' ? 24 : 20, marginTop: 12, opacity: 0.75 }]}>
-                      <Text style={[styles.taskTitle, { fontSize: getFontSize('body'), color: theme.text, textDecorationLine: 'line-through' }]}>
-                        {item.title}
-                      </Text>
-                      <TouchableOpacity
-                        style={[styles.button, { backgroundColor: theme.btnCompleted }]}
-                        onPress={() => handleToggleTask(item.id, item.completed)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Marcar ${item.title} como não concluída`}
+                  {showCompleted &&
+                    completedTasks.map((item) => (
+                      <View
+                        key={item.title}
+                        style={[
+                          styles.taskCard,
+                          {
+                            backgroundColor: theme.card,
+                            borderColor: theme.border,
+                            padding: prefs.spacing === 'wide' ? 24 : 20,
+                            marginTop: 12,
+                            opacity: 0.75,
+                          },
+                        ]}
                       >
-                        <Text style={[styles.btnText, { fontSize: getFontSize('button'), color: theme.btnText }]}>
-                          ✓ Concluído (toque para desfazer)
+                        <Text
+                          style={[
+                            styles.taskTitle,
+                            { fontSize: getFontSize('body'), color: theme.text, textDecorationLine: 'line-through' },
+                          ]}
+                        >
+                          {item.title}
                         </Text>
-                      </TouchableOpacity>
-                    </View>
-                  ))}
+                        <TouchableOpacity
+                          style={[styles.button, { backgroundColor: theme.btnCompleted }]}
+                          onPress={() => handleToggleTask(item)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Marcar ${item.title} como não concluída`}
+                        >
+                          <Text style={[styles.btnText, { fontSize: getFontSize('button'), color: theme.btnText }]}>
+                            ✓ Concluído (toque para desfazer)
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
                 </View>
               ) : null
             }
@@ -231,21 +262,22 @@ export default function TasksScreen() {
         )}
       </View>
 
-      {/* FLUXO GUIADO PASSO A PASSO */}
+      {/* FLUXO GUIADO PASSO A PASSO COM DADOS DO FIRESTORE */}
       {guidedTask && (
         <GuidedTaskModal
-          task={{ title: guidedTask.title, steps: GetGuidedSteps.execute(guidedTask) }}
+          task={{
+            title: guidedTask.title,
+            steps: guidedTask.steps || ['Siga o passo a passo na tela do seu dispositivo.'],
+          }}
           onClose={() => {
             if (prefs.extraConfirmation) {
               setShowLeaveGuide(true);
-              return;
+            } else {
+              setGuidedTask(null);
             }
-
-            setGuidedTask(null);
           }}
           onComplete={() => {
-            handleToggleTask(guidedTask.id, guidedTask.completed);
-            setGuidedTask(null);
+            handleToggleTask(guidedTask);
           }}
         />
       )}
@@ -257,47 +289,45 @@ export default function TasksScreen() {
         onDismiss={() => setSuccessMessage(null)}
       />
 
-      {/* CONFIRMAÇÃO VISUAL ANTES DE CONCLUIR TAREFA */}
+      {/* DIÁLOGOS DE CONFIRMAÇÃO */}
       <ConfirmDialog
         visible={!!taskPendingComplete}
         title="Concluir Atividade?"
-        message={`Deseja confirmar a conclusão da atividade "${taskPendingComplete?.title}"?`}
+        message={`Deseja confirmar a conclusão de "${taskPendingComplete?.title}"?`}
         confirmLabel="Sim, concluir"
         cancelLabel="Cancelar"
         onConfirm={() => {
-          if (taskPendingComplete) performToggle(taskPendingComplete.id, taskPendingComplete.completed);
+          if (taskPendingComplete) performToggle(taskPendingComplete);
           setTaskPendingComplete(null);
         }}
         onCancel={() => setTaskPendingComplete(null)}
       />
+
       <ConfirmDialog
         visible={!!taskPendingUndo}
         title="Desfazer atividade concluída?"
-        message='Essa atividade vai voltar para "pendente" e sair do seu Histórico. Deseja continuar?'
+        message='Essa atividade vai voltar para "pendente". Deseja continuar?'
         confirmLabel="Sim, desfazer"
         cancelLabel="Cancelar"
         destructive
         onConfirm={() => {
-          if (taskPendingUndo) performToggle(taskPendingUndo.id, taskPendingUndo.completed);
+          if (taskPendingUndo) performToggle(taskPendingUndo);
           setTaskPendingUndo(null);
         }}
         onCancel={() => setTaskPendingUndo(null)}
       />
+
       <ConfirmDialog
         visible={showLeaveGuide}
         title="Sair da atividade?"
         message="Seu progresso não será salvo. Deseja sair?"
         confirmLabel="Sair"
         cancelLabel="Continuar"
-
         onConfirm={() => {
           setGuidedTask(null);
           setShowLeaveGuide(false);
         }}
-
-        onCancel={() =>
-          setShowLeaveGuide(false)
-        }
+        onCancel={() => setShowLeaveGuide(false)}
       />
     </View>
   );
@@ -309,7 +339,7 @@ const styles = StyleSheet.create({
   taskCard: {
     borderWidth: 2,
     borderRadius: 16,
-    elevation: 2
+    elevation: 2,
   },
   taskTitle: { marginBottom: 8, fontWeight: '500', lineHeight: 28 },
   button: {
@@ -317,7 +347,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 52
+    minHeight: 52,
   },
   btnText: { fontWeight: 'bold' },
   toggleCompletedBtn: {

@@ -5,6 +5,18 @@ export interface Task {
   category?: string;
   courseId?: string;
   courseName?: string;
-  // 🌟 Preenchido quando a tarefa é concluída, usado no histórico simples de atividades
   completedAt?: string;
+}
+
+export interface TaskItem {
+  category: string;
+  title: string;
+  steps?: string[];
+}
+
+export interface Course {
+  id: string;
+  name: string;
+  description: string;
+  tasks: TaskItem[];
 }

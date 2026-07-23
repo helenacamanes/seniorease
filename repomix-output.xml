@@ -75,6 +75,7 @@ apps/
         DashboardScreen.tsx
         HistoryScreen.tsx
         LoginScreen.tsx
+        ProfileScreen.tsx
         TasksScreen.tsx
         WelcomeScreen.tsx
     .gitignore
@@ -109,6 +110,7 @@ apps/
         MainLayout.tsx
         WebDashboard.tsx
         WebHistory.tsx
+        WebProfile.tsx
         WebSettings.tsx
         WebSuccessToast.tsx
         WebTasks.tsx
@@ -174,30 +176,6 @@ turbo.json
 <files>
 This section contains the contents of the repository's files.
 
-<file path="turbo.json">
-{
-  "$schema": "https://turbo.build/schema.json",
-  "ui": "tui",
-  "tasks": {
-    "build": {
-      "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
-    },
-    "lint": {
-      "dependsOn": ["^build"]
-    },
-    "test": {
-      "dependsOn": ["^build"],
-      "outputs": ["coverage/**"]
-    },
-    "dev": {
-      "cache": false,
-      "persistent": true
-    }
-  }
-}
-</file>
-
 <file path=".expo/devices.json">
 {
   "devices": []
@@ -219,43 +197,6 @@ The ".expo" folder is created when an Expo project is started using "expo start"
 
 No, you should not share the ".expo" folder. It does not contain any information that is relevant for other developers working on the project, it is specific to your machine.
 Upon project creation, the ".expo" folder is already added to your ".gitignore" file.
-</file>
-
-<file path=".github/workflows/ci.yml">
-name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-
-jobs:
-  build-and-test:
-    name: Build, Lint e Testes
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout do código
-        uses: actions/checkout@v4
-
-      - name: Configurar Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Instalar dependências
-        run: npm ci
-
-      - name: Rodar Lint (Turborepo)
-        run: npx turbo lint
-
-      - name: Rodar Testes (Turborepo)
-        run: npx turbo test
-
-      - name: Rodar Build (Turborepo)
-        run: npx turbo build
 </file>
 
 <file path="apps/mobile/src/components/AccessibleButton.tsx">
@@ -815,6 +756,171 @@ const styles = StyleSheet.create({
 });
 </file>
 
+<file path="apps/mobile/src/screens/ProfileScreen.tsx">
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { auth } from '../lib/firebase';
+import { useAccessibility } from '../context/AccessibilityContext';
+
+export default function ProfileScreen() {
+  const { prefs } = useAccessibility();
+
+  const user = auth.currentUser;
+
+  const theme = {
+    background: prefs.highContrast ? '#000000' : '#f8fafc',
+    card: prefs.highContrast ? '#121212' : '#ffffff',
+    border: prefs.highContrast ? '#facc15' : '#cbd5e1',
+    text: prefs.highContrast ? '#facc15' : '#1e293b',
+    muted: prefs.highContrast ? '#fde047' : '#64748b',
+  };
+
+  const getFontSize = (title = false) => {
+    if (prefs.fontSize === 'extra-large') {
+      return title ? 30 : 20;
+    }
+
+    if (prefs.fontSize === 'large') {
+      return title ? 26 : 18;
+    }
+
+    return title ? 22 : 15;
+  };
+
+  return (
+    <ScrollView
+      style={[
+        styles.container,
+        { backgroundColor: theme.background },
+      ]}
+    >
+      <Text
+        style={[
+          styles.title,
+          {
+            color: theme.text,
+            fontSize: getFontSize(true),
+          },
+        ]}
+      >
+        Meu Perfil 👤
+      </Text>
+
+      <Text
+        style={{
+          color: theme.muted,
+          fontSize: getFontSize(),
+          marginBottom: 24,
+        }}
+      >
+        Informações da sua conta na plataforma.
+      </Text>
+
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: theme.card,
+            borderColor: theme.border,
+          },
+        ]}
+      >
+        <ProfileItem
+          label="Nome"
+          value={user?.displayName || 'Não informado'}
+          theme={theme}
+          size={getFontSize()}
+        />
+
+        <ProfileItem
+          label="E-mail"
+          value={user?.email || 'Não informado'}
+          theme={theme}
+          size={getFontSize()}
+        />
+
+        <ProfileItem
+          label="UID"
+          value={user?.uid || 'Não disponível'}
+          theme={theme}
+          size={getFontSize()}
+        />
+
+        <ProfileItem
+          label="Modo Simplificado"
+          value={prefs.simplifiedMode ? 'Ativado' : 'Desativado'}
+          theme={theme}
+          size={getFontSize()}
+        />
+
+        <ProfileItem
+          label="Alto Contraste"
+          value={prefs.highContrast ? 'Ativado' : 'Desativado'}
+          theme={theme}
+          size={getFontSize()}
+        />
+
+        <ProfileItem
+          label="Fonte"
+          value={prefs.fontSize}
+          theme={theme}
+          size={getFontSize()}
+        />
+      </View>
+    </ScrollView>
+  );
+}
+
+function ProfileItem({
+  label,
+  value,
+  theme,
+  size,
+}: any) {
+  return (
+    <View style={{ marginBottom: 20 }}>
+      <Text
+        style={{
+          color: theme.muted,
+          fontWeight: 'bold',
+          fontSize: size,
+        }}
+      >
+        {label}
+      </Text>
+
+      <Text
+        style={{
+          color: theme.text,
+          fontSize: size,
+          marginTop: 4,
+        }}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 20,
+  },
+
+  title: {
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+
+  card: {
+    borderWidth: 3,
+    borderRadius: 16,
+    padding: 24,
+  },
+});
+</file>
+
 <file path="apps/mobile/.gitignore">
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
@@ -1203,80 +1309,207 @@ export default function WebHistory() {
 }
 </file>
 
-<file path="apps/web/src/components/WebSuccessToast.tsx">
+<file path="apps/web/src/components/WebProfile.tsx">
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { auth, db } from '../lib/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { useAccessibility } from '../context/AccessibilityContext';
 
-interface SuccessToastProps {
-  visible: boolean;
-  message: string;
-  onDismiss: () => void;
+interface UserProfile {
+  name?: string;
+  email?: string;
 }
 
-// 🌟 "Ativação de feedback visual reforçado" pedido no briefing.
-// Quando `enhancedFeedback` está ligado, mostramos este banner animado
-// (cor + ícone + entrada/saída suave) em vez de só um alert() simples.
-export default function SuccessToast({ visible, message, onDismiss }: SuccessToastProps) {
+export default function WebProfile() {
   const { prefs } = useAccessibility();
-  const [show, setShow] = useState(false);
+
+  const [profile, setProfile] = useState<UserProfile>({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!visible) return;
-    setShow(true);
-    const hideTimer = setTimeout(() => setShow(false), 1600);
-    const dismissTimer = setTimeout(() => onDismiss(), 1900);
-    return () => {
-      clearTimeout(hideTimer);
-      clearTimeout(dismissTimer);
-    };
-  }, [visible]);
+    const user = auth.currentUser;
 
-  if (!visible) return null;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    const userRef = doc(db, 'users', user.uid);
+
+    const unsubscribe = onSnapshot(
+      userRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          setProfile(snapshot.data() as UserProfile);
+        }
+
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Erro ao carregar perfil:', error);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
 
   const theme = {
-    bg: prefs.highContrast ? '#000000' : '#16a34a',
-    text: prefs.highContrast ? '#facc15' : '#ffffff',
-    iconBg: prefs.highContrast ? '#facc15' : '#ffffff',
-    iconColor: prefs.highContrast ? '#000000' : '#16a34a',
-    border: prefs.highContrast ? '3px solid #facc15' : 'none',
+    card: prefs.highContrast ? '#121212' : '#ffffff',
+    border: prefs.highContrast ? '#facc15' : '#e2e8f0',
+    text: prefs.highContrast ? '#facc15' : '#1e293b',
+    muted: prefs.highContrast ? '#fde047' : '#64748b',
   };
 
-  const fontSize = prefs.fontSize === 'extra-large' ? '22px' : prefs.fontSize === 'large' ? '19px' : '17px';
+  const getFontSize = (type: 'title' | 'body') => {
+    const isLarge = prefs.fontSize === 'large';
+    const isExtra = prefs.fontSize === 'extra-large';
+
+    return type === 'title'
+      ? isExtra
+        ? '32px'
+        : isLarge
+        ? '28px'
+        : '24px'
+      : isExtra
+      ? '20px'
+      : isLarge
+      ? '18px'
+      : '15px';
+  };
+
+  if (loading) {
+    return (
+      <p style={{ color: theme.muted }}>
+        Carregando informações do perfil...
+      </p>
+    );
+  }
+
+  const user = auth.currentUser;
 
   return (
     <div
       style={{
-        position: 'fixed',
-        top: '32px',
-        left: '50%',
-        transform: `translateX(-50%) translateY(${show ? '0' : '-30px'})`,
-        opacity: show ? 1 : 0,
-        transition: 'transform 0.3s ease, opacity 0.3s ease',
-        zIndex: 2000,
+        maxWidth: '800px',
         display: 'flex',
-        alignItems: 'center',
-        gap: '16px',
-        backgroundColor: theme.bg,
-        color: theme.text,
-        border: theme.border,
-        borderRadius: '18px',
-        padding: '20px 28px',
-        boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
-        maxWidth: '90vw',
+        flexDirection: 'column',
+        gap: '24px',
       }}
     >
-      <span
+      <header>
+        <h1
+          style={{
+            margin: 0,
+            color: theme.text,
+            fontSize: getFontSize('title'),
+          }}
+        >
+          Meu Perfil 👤
+        </h1>
+
+        <p
+          style={{
+            color: theme.muted,
+            fontSize: getFontSize('body'),
+          }}
+        >
+          Informações da sua conta e do seu progresso na plataforma.
+        </p>
+      </header>
+
+      <div
         style={{
-          width: '40px', height: '40px', borderRadius: '50%', backgroundColor: theme.iconBg,
-          color: theme.iconColor, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontWeight: 'bold', fontSize: '22px', flexShrink: 0,
+          backgroundColor: theme.card,
+          border: `3px solid ${theme.border}`,
+          borderRadius: '16px',
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px',
         }}
       >
-        ✓
-      </span>
-      <span style={{ fontWeight: 'bold', fontSize }}>{message}</span>
+        <InfoItem
+          label="Nome"
+          value={profile.name || 'Não informado'}
+          theme={theme}
+          size={getFontSize('body')}
+        />
+
+        <InfoItem
+          label="E-mail"
+          value={profile.email || user?.email || 'Não informado'}
+          theme={theme}
+          size={getFontSize('body')}
+        />
+
+        <InfoItem
+          label="Identificador da Conta"
+          value={user?.uid || 'Não disponível'}
+          theme={theme}
+          size={getFontSize('body')}
+        />
+
+        <InfoItem
+          label="Modo Simplificado"
+          value={prefs.simplifiedMode ? 'Ativado' : 'Desativado'}
+          theme={theme}
+          size={getFontSize('body')}
+        />
+
+        <InfoItem
+          label="Alto Contraste"
+          value={prefs.highContrast ? 'Ativado' : 'Desativado'}
+          theme={theme}
+          size={getFontSize('body')}
+        />
+
+        <InfoItem
+          label="Tamanho da Fonte"
+          value={prefs.fontSize}
+          theme={theme}
+          size={getFontSize('body')}
+        />
+      </div>
+    </div>
+  );
+}
+
+function InfoItem({
+  label,
+  value,
+  theme,
+  size,
+}: {
+  label: string;
+  value: string;
+  theme: any;
+  size: string;
+}) {
+  return (
+    <div>
+      <p
+        style={{
+          margin: 0,
+          color: theme.muted,
+          fontWeight: 'bold',
+          fontSize: size,
+        }}
+      >
+        {label}
+      </p>
+
+      <p
+        style={{
+          marginTop: '6px',
+          color: theme.text,
+          fontSize: size,
+        }}
+      >
+        {value}
+      </p>
     </div>
   );
 }
@@ -2887,6 +3120,67 @@ npm install
 }
 </file>
 
+<file path="turbo.json">
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "tui",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+    },
+    "lint": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
+</file>
+
+<file path=".github/workflows/ci.yml">
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    name: Build, Lint e Testes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Rodar Lint (Turborepo)
+        run: npx turbo lint
+
+      - name: Rodar Testes (Turborepo)
+        run: npx turbo test
+
+      - name: Rodar Build (Turborepo)
+        run: npx turbo build
+</file>
+
 <file path="apps/mobile/src/components/Header.tsx">
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
@@ -2986,115 +3280,6 @@ const styles = StyleSheet.create({
   logoutText: {
     fontWeight: 'bold',
   },
-});
-</file>
-
-<file path="apps/mobile/src/navigation/MainTabNavigator.tsx">
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { useAccessibility } from '../context/AccessibilityContext';
-import TasksScreen from '../screens/TasksScreen';
-import DashboardScreen from '../screens/DashboardScreen';
-import HistoryScreen from '../screens/HistoryScreen';
-import AccessibilityPanelScreen from '../screens/AccessibilityPanelScreen';
-
-type TabKey = 'courses' | 'tasks' | 'history' | 'settings';
-
-export default function MainTabNavigator() {
-  const { prefs } = useAccessibility();
-  const [currentTab, setCurrentTab] = useState<TabKey>('tasks');
-
-  const getTabFontSize = () => {
-    if (prefs.fontSize === 'extra-large') return 18;
-    if (prefs.fontSize === 'large') return 16;
-    return 13;
-  };
-
-  const theme = {
-    navBg: prefs.highContrast ? '#000000' : '#ffffff',
-    border: prefs.highContrast ? '#facc15' : '#cbd5e1',
-    activeText: prefs.highContrast ? '#facc15' : '#1e40af',
-    inactiveText: prefs.highContrast ? '#888888' : '#64748b',
-    activeBg: prefs.highContrast ? '#222222' : '#f1f5f9',
-  };
-
-  // 🌟 MODO SIMPLIFICADO: menos abas na tela, para reduzir a quantidade de
-  // escolhas e complexidade visual. "Cursos" (dashboard de progresso) some
-  // e o app abre direto nas Tarefas, que é a ação mais usada no dia a dia.
-  const tabs: { key: TabKey; icon: string; label: string }[] = prefs.simplifiedMode
-    ? [
-        { key: 'tasks', icon: '📋', label: 'Tarefas' },
-        { key: 'history', icon: '🗂️', label: 'Histórico' },
-        { key: 'settings', icon: '⚙️', label: 'Ajustes' },
-      ]
-    : [
-        { key: 'courses', icon: '🎓', label: 'Cursos' },
-        { key: 'tasks', icon: '📋', label: 'Tarefas' },
-        { key: 'history', icon: '🗂️', label: 'Histórico' },
-        { key: 'settings', icon: '⚙️', label: 'Ajustes' },
-      ];
-
-  // Se o usuário ativar o Modo Simplificado enquanto estava na aba "Cursos"
-  // (que deixa de existir), voltamos para "Tarefas" para não sumir a tela.
-  React.useEffect(() => {
-    if (prefs.simplifiedMode && currentTab === 'courses') {
-      setCurrentTab('tasks');
-    }
-  }, [prefs.simplifiedMode, currentTab]);
-
-  const renderScreen = () => {
-    switch (currentTab) {
-      case 'courses':
-        return <DashboardScreen />;
-      case 'tasks':
-        return <TasksScreen />;
-      case 'history':
-        return <HistoryScreen />;
-      case 'settings':
-        return <AccessibilityPanelScreen />;
-      default:
-        return <TasksScreen />;
-    }
-  };
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.content}>{renderScreen()}</View>
-
-      {/* 🧭 NAV BAR */}
-      <View
-        style={[
-          styles.tabBar,
-          {
-            backgroundColor: theme.navBg,
-            borderTopColor: theme.border,
-            height: prefs.spacing === 'wide' ? 95 : 80
-          }
-        ]}
-      >
-        {tabs.map((tab) => (
-          <Pressable
-            key={tab.key}
-            onPress={() => setCurrentTab(tab.key)}
-            style={[styles.tabItem, currentTab === tab.key && { backgroundColor: theme.activeBg }]}
-          >
-            <Text style={{ fontSize: prefs.fontSize === 'extra-large' ? 28 : 24 }}>{tab.icon}</Text>
-            <Text style={[styles.tabLabel, { fontSize: getTabFontSize(), color: currentTab === tab.key ? theme.activeText : theme.inactiveText }]}>
-              {tab.label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { flex: 1 },
-  tabBar: { flexDirection: 'row', borderTopWidth: 3, justifyContent: 'space-around', alignItems: 'center', paddingBottom: 10 },
-  tabItem: { flex: 1, height: '100%', justifyContent: 'center', alignItems: 'center' },
-  tabLabel: { fontWeight: 'bold', marginTop: 2 },
 });
 </file>
 
@@ -3259,133 +3444,6 @@ const styles = StyleSheet.create({
 }
 </file>
 
-<file path="apps/web/src/components/MainLayout.tsx">
-'use client';
-
-import React, { useEffect, useState } from 'react';
-import { useAccessibility } from '../context/AccessibilityContext';
-import WebDashboard from './WebDashboard';
-import WebTasks from './WebTasks';
-import WebHistory from './WebHistory';
-import WebSettings from './WebSettings';
-
-type TabKey = 'courses' | 'tasks' | 'history' | 'settings';
-
-export default function MainLayout() {
-  const { prefs } = useAccessibility();
-  const [currentTab, setCurrentTab] = useState<TabKey>('courses');
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
-
-  // Paleta adaptável baseada nas preferências de acessibilidade
-  const theme = {
-    bg: prefs.highContrast ? '#000000' : '#f8fafc',
-    sidebarBg: prefs.highContrast ? '#121212' : '#ffffff',
-    borderColor: prefs.highContrast ? '#facc15' : '#e2e8f0',
-    text: prefs.highContrast ? '#facc15' : '#1e293b',
-    activeBg: prefs.highContrast ? '#222222' : '#f1f5f9',
-    activeText: prefs.highContrast ? '#ffffff' : '#1e40af',
-  };
-
-  const handleSelectCourse = (courseId: string) => {
-    setSelectedCourseId(courseId);
-    setCurrentTab('tasks');
-  };
-
-  const getFontSize = () => {
-    if (prefs.fontSize === 'extra-large') return '22px';
-    if (prefs.fontSize === 'large') return '19px';
-    return '16px';
-  };
-
-  // 🌟 MODO SIMPLIFICADO: menos itens no menu, para reduzir a quantidade de
-  // escolhas e complexidade visual. "Cursos" (dashboard de progresso) some
-  // e o app abre direto nas Tarefas, que é a ação mais usada no dia a dia.
-  const navItems: { key: TabKey; icon: string; label: string }[] = prefs.simplifiedMode
-    ? [
-        { key: 'tasks', icon: '📋', label: 'Minhas Tarefas' },
-        { key: 'history', icon: '🗂️', label: 'Histórico' },
-        { key: 'settings', icon: '⚙️', label: 'Ajustes' },
-      ]
-    : [
-        { key: 'courses', icon: '🎓', label: 'Cursos' },
-        { key: 'tasks', icon: '📋', label: 'Minhas Tarefas' },
-        { key: 'history', icon: '🗂️', label: 'Histórico' },
-        { key: 'settings', icon: '⚙️', label: 'Ajustes' },
-      ];
-
-  // Se ligar o Modo Simplificado enquanto está na aba "Cursos" (que some),
-  // voltamos para "Tarefas" para a tela não ficar em branco.
-  useEffect(() => {
-    if (prefs.simplifiedMode && currentTab === 'courses') {
-      setCurrentTab('tasks');
-    }
-  }, [prefs.simplifiedMode, currentTab]);
-
-  const renderContent = () => {
-    switch (currentTab) {
-      case 'courses':
-        return <WebDashboard onSelectCourse={handleSelectCourse} />;
-      case 'tasks':
-        return (
-          <WebTasks
-            activeCourseFilter={selectedCourseId}
-            onClearFilter={() => setSelectedCourseId(null)}
-          />
-        );
-      case 'history':
-        return <WebHistory />;
-      case 'settings':
-        return <WebSettings />;
-      default:
-        return <WebTasks activeCourseFilter={null} onClearFilter={() => {}} />;
-    }
-  };
-
-  return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: theme.bg, fontFamily: 'sans-serif' }}>
-
-      {/* 🧭 BARRA LATERAL ACESSÍVEL (Único local de navegação e ajustes agora) */}
-      <nav style={{
-        width: prefs.spacing === 'wide' ? '320px' : '260px',
-        backgroundColor: theme.sidebarBg,
-        borderRight: `3px solid ${theme.borderColor}`,
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '24px 16px',
-        gap: prefs.spacing === 'wide' ? '20px' : '12px'
-      }}>
-        <div style={{ fontSize: '24px', fontWeight: 'bold', color: theme.text, marginBottom: '20px', textAlign: 'center' }}>
-          Plataforma Digital 🎓
-        </div>
-
-        {navItems.map((item) => (
-          <button
-            key={item.key}
-            onClick={() => {
-              if (item.key === 'courses') setSelectedCourseId(null);
-              setCurrentTab(item.key);
-            }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '14px', width: '100%', padding: '16px',
-              border: `2px solid ${currentTab === item.key ? theme.borderColor : 'transparent'}`,
-              borderRadius: '12px', cursor: 'pointer', textAlign: 'left', fontWeight: 'bold', fontSize: getFontSize(),
-              backgroundColor: currentTab === item.key ? theme.activeBg : 'transparent', color: theme.text
-            }}
-          >
-            <span style={{ fontSize: '28px' }}>{item.icon}</span> {item.label}
-          </button>
-        ))}
-      </nav>
-
-      {/* 💻 CONTEÚDO PRINCIPAL */}
-      <main style={{ flex: 1, padding: '40px', overflowY: 'auto' }}>
-        {renderContent()}
-      </main>
-    </div>
-  );
-}
-</file>
-
 <file path="apps/web/src/components/WebDashboard.tsx">
 'use client';
 
@@ -3534,239 +3592,85 @@ export default function WebDashboard({ onSelectCourse }: WebDashboardProps) {
 }
 </file>
 
-<file path="apps/web/src/components/WebSettings.tsx">
+<file path="apps/web/src/components/WebSuccessToast.tsx">
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAccessibility } from '../context/AccessibilityContext';
 
-export default function WebSettings() {
-  const { prefs, updatePrefs } = useAccessibility();
+interface SuccessToastProps {
+  visible: boolean;
+  message: string;
+  onDismiss: () => void;
+}
+
+// 🌟 "Ativação de feedback visual reforçado" pedido no briefing.
+// Quando `enhancedFeedback` está ligado, mostramos este banner animado
+// (cor + ícone + entrada/saída suave) em vez de só um alert() simples.
+export default function SuccessToast({ visible, message, onDismiss }: SuccessToastProps) {
+  const { prefs } = useAccessibility();
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    setShow(true);
+    const hideTimer = setTimeout(() => setShow(false), 1600);
+    const dismissTimer = setTimeout(() => onDismiss(), 1900);
+    return () => {
+      clearTimeout(hideTimer);
+      clearTimeout(dismissTimer);
+    };
+  }, [visible]);
+
+  if (!visible) return null;
 
   const theme = {
-    card: prefs.highContrast ? '#121212' : '#ffffff',
-    borderColor: prefs.highContrast ? '#facc15' : '#e2e8f0',
-    text: prefs.highContrast ? '#facc15' : '#1e293b',
-    textMuted: prefs.highContrast ? '#eab308' : '#64748b',
-    buttonBg: prefs.highContrast ? '#222222' : '#f1f5f9',
-    buttonActiveBg: prefs.highContrast ? '#facc15' : '#1e40af',
-    buttonActiveText: prefs.highContrast ? '#000000' : '#ffffff',
+    bg: prefs.highContrast ? '#000000' : '#16a34a',
+    text: prefs.highContrast ? '#facc15' : '#ffffff',
+    iconBg: prefs.highContrast ? '#facc15' : '#ffffff',
+    iconColor: prefs.highContrast ? '#000000' : '#16a34a',
+    border: prefs.highContrast ? '3px solid #facc15' : 'none',
   };
 
-  const getFontSize = (type: 'title' | 'body') => {
-    const isLarge = prefs.fontSize === 'large';
-    const isExtra = prefs.fontSize === 'extra-large';
-    return type === 'title' ? (isExtra ? '32px' : isLarge ? '28px' : '24px') : (isExtra ? '20px' : isLarge ? '18px' : '15px');
-  };
-
-  const updatePreference = (key: keyof typeof prefs, value: any) => {
-    updatePrefs({ ...(prefs as any), [key]: value });
-  };
+  const fontSize = prefs.fontSize === 'extra-large' ? '22px' : prefs.fontSize === 'large' ? '19px' : '17px';
 
   return (
-    <div style={{ maxWidth: '800px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
-      <header style={{ borderBottom: `2px solid ${theme.borderColor}`, paddingBottom: '20px' }}>
-        <h1 style={{ fontSize: getFontSize('title'), color: theme.text, margin: 0 }}>Ajustes de Acessibilidade ⚙️</h1>
-        <p style={{ fontSize: getFontSize('body'), color: theme.textMuted, marginTop: '10px' }}>
-          Escolha as opções abaixo para deixar a leitura do aplicativo mais confortável para você.
-        </p>
-      </header>
+    <div
+      style={{
+        position: 'fixed',
+        top: '32px',
+        left: '50%',
+        opacity: show ? 1 : 0,
+        transition: prefs.reduceMotion
+          ? 'none'
+          : 'transform 0.3s ease, opacity 0.3s ease',
 
-      {/* 🅰️ SEÇÃO: TAMANHO DA LETRA */}
-      <section style={{ backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <h2 style={{ fontSize: getFontSize('body'), fontWeight: 'bold', color: theme.text, margin: 0 }}>🅰️ Tamanho do Texto</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-          {(['normal', 'large', 'extra-large'] as const).map((size) => {
-            const isActive = prefs.fontSize === size;
-            const labels = { normal: 'Padrão', large: 'Grande', 'extra-large': 'Muito Grande' };
-            return (
-              <button
-                key={size}
-                onClick={() => updatePreference('fontSize', size)}
-                style={{
-                  padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
-                  fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
-                  backgroundColor: isActive ? theme.buttonActiveBg : theme.buttonBg,
-                  color: isActive ? theme.buttonActiveText : theme.text
-                }}
-              >
-                {labels[size]}
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ↕️ SEÇÃO: ESPAÇAMENTO */}
-      <section style={{ backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <h2 style={{ fontSize: getFontSize('body'), fontWeight: 'bold', color: theme.text, margin: 0 }}>↕️ Espaçamento das Telas</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
-          {(['normal', 'wide'] as const).map((space) => {
-            const isActive = prefs.spacing === space;
-            return (
-              <button
-                key={space}
-                onClick={() => updatePreference('spacing', space)}
-                style={{
-                  padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
-                  fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
-                  backgroundColor: isActive ? theme.buttonActiveBg : theme.buttonBg,
-                  color: isActive ? theme.buttonActiveText : theme.text
-                }}
-              >
-                {space === 'normal' ? 'Espaço Normal' : 'Mais Espaço entre Itens'}
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* 🎨 SEÇÃO: ALTO CONTRASTE */}
-      <section style={{ backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <h2 style={{ fontSize: getFontSize('body'), fontWeight: 'bold', color: theme.text, margin: 0 }}>🎨 Cores da Tela</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
-          <button
-            onClick={() => updatePreference('highContrast', false)}
-            style={{
-              padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
-              fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
-              backgroundColor: !prefs.highContrast ? theme.buttonActiveBg : theme.buttonBg,
-              color: !prefs.highContrast ? theme.buttonActiveText : theme.text
-            }}
-          >
-            ⚪ Cores Normais (Claro)
-          </button>
-          <button
-            onClick={() => updatePreference('highContrast', true)}
-            style={{
-              padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
-              fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
-              backgroundColor: prefs.highContrast ? theme.buttonActiveBg : theme.buttonBg,
-              color: prefs.highContrast ? theme.buttonActiveText : theme.text
-            }}
-          >
-            ⚫ Alto Contraste (Fundo Preto)
-          </button>
-        </div>
-      </section>
-
-      {/* 🧭 SEÇÃO: MODO DE NAVEGAÇÃO */}
-      <section style={{ backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <h2 style={{ fontSize: getFontSize('body'), fontWeight: 'bold', color: theme.text, margin: 0 }}>🧭 Modo de Navegação</h2>
-        <p style={{ fontSize: getFontSize('body'), color: theme.textMuted, margin: 0 }}>
-          O Modo Simplificado deixa o menu com menos opções e mostra só o essencial na tela.
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
-          <button
-            onClick={() => updatePreference('simplifiedMode', false)}
-            style={{
-              padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
-              fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
-              backgroundColor: !prefs.simplifiedMode ? theme.buttonActiveBg : theme.buttonBg,
-              color: !prefs.simplifiedMode ? theme.buttonActiveText : theme.text
-            }}
-          >
-            📋 Modo Padrão
-          </button>
-          <button
-            onClick={() => updatePreference('simplifiedMode', true)}
-            style={{
-              padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
-              fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
-              backgroundColor: prefs.simplifiedMode ? theme.buttonActiveBg : theme.buttonBg,
-              color: prefs.simplifiedMode ? theme.buttonActiveText : theme.text
-            }}
-          >
-            ✨ Modo Simplificado
-          </button>
-        </div>
-      </section>
-
-      {/* 🔒 SEÇÃO: CONFIRMAÇÃO ANTES DE AÇÕES IMPORTANTES */}
-      <section style={{ backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <h2 style={{ fontSize: getFontSize('body'), fontWeight: 'bold', color: theme.text, margin: 0 }}>🔒 Confirmação antes de Sair</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
-          <button
-            onClick={() => updatePreference('extraConfirmation', false)}
-            style={{
-              padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
-              fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
-              backgroundColor: !prefs.extraConfirmation ? theme.buttonActiveBg : theme.buttonBg,
-              color: !prefs.extraConfirmation ? theme.buttonActiveText : theme.text
-            }}
-          >
-            Sair Direto, Sem Avisar
-          </button>
-          <button
-            onClick={() => updatePreference('extraConfirmation', true)}
-            style={{
-              padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
-              fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
-              backgroundColor: prefs.extraConfirmation ? theme.buttonActiveBg : theme.buttonBg,
-              color: prefs.extraConfirmation ? theme.buttonActiveText : theme.text
-            }}
-          >
-            🔒 Sempre Perguntar Antes
-          </button>
-        </div>
-      </section>
-
-      {/* 📅 SEÇÃO: LEMBRETES DE ESTUDO */}
-      <section style={{ backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <h2 style={{ fontSize: getFontSize('body'), fontWeight: 'bold', color: theme.text, margin: 0 }}>📅 Lembretes de Estudo</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-          {(['none', 'daily', 'weekly'] as const).map((freq) => {
-            const isActive = prefs.reminderFrequency === freq;
-            const labels = { none: 'Não Avisar', daily: 'Todo Dia 📅', weekly: 'Toda Semana 🗓️' };
-            return (
-              <button
-                key={freq}
-                onClick={() => updatePreference('reminderFrequency', freq)}
-                style={{
-                  padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
-                  fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
-                  backgroundColor: isActive ? theme.buttonActiveBg : theme.buttonBg,
-                  color: isActive ? theme.buttonActiveText : theme.text
-                }}
-              >
-                {labels[freq]}
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* 🎉 SEÇÃO: FEEDBACK VISUAL REFORÇADO */}
-      <section style={{ backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <h2 style={{ fontSize: getFontSize('body'), fontWeight: 'bold', color: theme.text, margin: 0 }}>🎉 Feedback Visual Reforçado</h2>
-        <p style={{ fontSize: getFontSize('body'), color: theme.textMuted, margin: 0 }}>
-          Quando ligado, o sistema mostra uma confirmação visual maior (com cor, ícone e animação) sempre que uma ação der certo, como concluir uma atividade.
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
-          <button
-            onClick={() => updatePreference('enhancedFeedback', false)}
-            style={{
-              padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
-              fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
-              backgroundColor: !prefs.enhancedFeedback ? theme.buttonActiveBg : theme.buttonBg,
-              color: !prefs.enhancedFeedback ? theme.buttonActiveText : theme.text
-            }}
-          >
-            Feedback Simples
-          </button>
-          <button
-            onClick={() => updatePreference('enhancedFeedback', true)}
-            style={{
-              padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
-              fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
-              backgroundColor: prefs.enhancedFeedback ? theme.buttonActiveBg : theme.buttonBg,
-              color: prefs.enhancedFeedback ? theme.buttonActiveText : theme.text
-            }}
-          >
-            🎉 Feedback Reforçado
-          </button>
-        </div>
-      </section>
+        transform: prefs.reduceMotion
+          ? 'translateX(-50%)'
+          : `translateX(-50%) translateY(${show ? '0' : '-30px'})`,
+        zIndex: 2000,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px',
+        backgroundColor: theme.bg,
+        color: theme.text,
+        border: theme.border,
+        borderRadius: '18px',
+        padding: '20px 28px',
+        boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
+        maxWidth: '90vw',
+      }}
+    >
+      <span
+        style={{
+          width: '40px', height: '40px', borderRadius: '50%', backgroundColor: theme.iconBg,
+          color: theme.iconColor, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontWeight: 'bold', fontSize: '22px', flexShrink: 0,
+        }}
+      >
+        ✓
+      </span>
+      <span style={{ fontWeight: 'bold', fontSize }}>{message}</span>
     </div>
   );
 }
@@ -3881,22 +3785,6 @@ export const seedCourses = async () => {
 };
 </file>
 
-<file path="packages/core-domain/src/accessibility/preferences.ts">
-export interface AccessibilityPreferences {
-  fontSize: 'normal' | 'large' | 'extra-large';
-  highContrast: boolean;
-  spacing: 'normal' | 'wide';
-
-  basicMode: boolean;
-  enhancedFeedback: boolean;
-  requireConfirmation: boolean;
-  reduceAnimations: boolean;
-
-  notificationsEnabled: boolean;
-  reminderTime: string;
-}
-</file>
-
 <file path="apps/mobile/src/lib/firebase.ts">
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import {
@@ -3930,6 +3818,121 @@ const auth = initializeAuth(app, {
 });
 
 export { app, auth, db };
+</file>
+
+<file path="apps/mobile/src/navigation/MainTabNavigator.tsx">
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { useAccessibility } from '../context/AccessibilityContext';
+import TasksScreen from '../screens/TasksScreen';
+import DashboardScreen from '../screens/DashboardScreen';
+import HistoryScreen from '../screens/HistoryScreen';
+import AccessibilityPanelScreen from '../screens/AccessibilityPanelScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+
+type TabKey = 'courses' | 'tasks' | 'history' | 'settings' | 'profile';
+
+export default function MainTabNavigator() {
+  const { prefs } = useAccessibility();
+  const [currentTab, setCurrentTab] = useState<TabKey>('tasks');
+
+  const getTabFontSize = () => {
+    if (prefs.fontSize === 'extra-large') return 18;
+    if (prefs.fontSize === 'large') return 16;
+    return 13;
+  };
+
+  const theme = {
+    navBg: prefs.highContrast ? '#000000' : '#ffffff',
+    border: prefs.highContrast ? '#facc15' : '#cbd5e1',
+    activeText: prefs.highContrast ? '#facc15' : '#1e40af',
+    inactiveText: prefs.highContrast ? '#888888' : '#64748b',
+    activeBg: prefs.highContrast ? '#222222' : '#f1f5f9',
+  };
+
+  // 🌟 MODO SIMPLIFICADO: menos abas na tela, para reduzir a quantidade de
+  // escolhas e complexidade visual. "Cursos" (dashboard de progresso) some
+  // e o app abre direto nas Tarefas, que é a ação mais usada no dia a dia.
+  const tabs: { key: TabKey; icon: string; label: string }[] = prefs.simplifiedMode
+    ? [
+      { key: 'tasks', icon: '📋', label: 'Tarefas' },
+      { key: 'settings', icon: '⚙️', label: 'Ajustes' },
+      { key: 'profile', icon: '👤', label: 'Perfil' }
+
+    ]
+    : [
+      { key: 'courses', icon: '🎓', label: 'Cursos' },
+      { key: 'tasks', icon: '📋', label: 'Tarefas' },
+      { key: 'history', icon: '🗂️', label: 'Histórico' },
+      { key: 'settings', icon: '⚙️', label: 'Ajustes' },
+      { key: 'profile', icon: '👤', label: 'Perfil' }
+
+    ];
+
+  // Se o usuário ativar o Modo Simplificado enquanto estava na aba "Cursos"
+  // (que deixa de existir), voltamos para "Tarefas" para não sumir a tela.
+  React.useEffect(() => {
+    if (prefs.simplifiedMode && currentTab === 'courses') {
+      setCurrentTab('tasks');
+    }
+  }, [prefs.simplifiedMode, currentTab]);
+
+  const renderScreen = () => {
+    switch (currentTab) {
+      case 'courses':
+        return <DashboardScreen />;
+      case 'tasks':
+        return <TasksScreen />;
+      case 'history':
+        return <HistoryScreen />;
+      case 'settings':
+        return <AccessibilityPanelScreen />;
+      case 'profile':
+        return <ProfileScreen />;
+      default:
+        return <TasksScreen />;
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.content}>{renderScreen()}</View>
+
+      {/* 🧭 NAV BAR */}
+      <View
+        style={[
+          styles.tabBar,
+          {
+            backgroundColor: theme.navBg,
+            borderTopColor: theme.border,
+            height: prefs.spacing === 'wide' ? 95 : 80
+          }
+        ]}
+      >
+        {tabs.map((tab) => (
+          <Pressable
+            key={tab.key}
+            onPress={() => setCurrentTab(tab.key)}
+            style={[styles.tabItem, currentTab === tab.key && { backgroundColor: theme.activeBg }]}
+          >
+            <Text style={{ fontSize: prefs.fontSize === 'extra-large' ? 28 : 24 }}>{tab.icon}</Text>
+            <Text style={[styles.tabLabel, { fontSize: getTabFontSize(), color: currentTab === tab.key ? theme.activeText : theme.inactiveText }]}>
+              {tab.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  content: { flex: 1 },
+  tabBar: { flexDirection: 'row', borderTopWidth: 3, justifyContent: 'space-around', alignItems: 'center', paddingBottom: 10 },
+  tabItem: { flex: 1, height: '100%', justifyContent: 'center', alignItems: 'center' },
+  tabLabel: { fontWeight: 'bold', marginTop: 2 },
+});
 </file>
 
 <file path="apps/web/app/auth/page.tsx">
@@ -4206,6 +4209,468 @@ export function AccessibilityPanel({ prefs, onChange }: AccessibilityPanelProps)
 }
 </file>
 
+<file path="apps/web/src/components/MainLayout.tsx">
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { useAccessibility } from '../context/AccessibilityContext';
+import WebDashboard from './WebDashboard';
+import WebTasks from './WebTasks';
+import WebHistory from './WebHistory';
+import WebSettings from './WebSettings';
+import ProfileScreen from './WebProfile';
+
+type TabKey = 'courses' | 'tasks' | 'history' | 'settings' | 'profile';
+
+export default function MainLayout() {
+  const { prefs } = useAccessibility();
+  const [currentTab, setCurrentTab] = useState<TabKey>('courses');
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+
+  // Paleta adaptável baseada nas preferências de acessibilidade
+  const theme = {
+    bg: prefs.highContrast ? '#000000' : '#f8fafc',
+    sidebarBg: prefs.highContrast ? '#121212' : '#ffffff',
+    borderColor: prefs.highContrast ? '#facc15' : '#e2e8f0',
+    text: prefs.highContrast ? '#facc15' : '#1e293b',
+    activeBg: prefs.highContrast ? '#222222' : '#f1f5f9',
+    activeText: prefs.highContrast ? '#ffffff' : '#1e40af',
+  };
+
+  const handleSelectCourse = (courseId: string) => {
+    setSelectedCourseId(courseId);
+    setCurrentTab('tasks');
+  };
+
+  const getFontSize = () => {
+    if (prefs.fontSize === 'extra-large') return '22px';
+    if (prefs.fontSize === 'large') return '19px';
+    return '16px';
+  };
+
+  const navItems: { key: TabKey; icon: string; label: string }[] = prefs.simplifiedMode
+    ? [
+      { key: 'profile', icon: '👤', label: 'Meu Perfil' },
+      { key: 'tasks', icon: '📋', label: 'Tarefas' },
+      { key: 'settings', icon: '⚙️', label: 'Ajustes' }
+    ]
+    : [
+      { key: 'profile', icon: '👤', label: 'Meu Perfil' },
+      { key: 'courses', icon: '🎓', label: 'Cursos' },
+      { key: 'tasks', icon: '📋', label: 'Tarefas' },
+      { key: 'history', icon: '🗂️', label: 'Histórico' },
+      { key: 'settings', icon: '⚙️', label: 'Ajustes' }
+    ];
+
+  useEffect(() => {
+    if (prefs.simplifiedMode && currentTab === 'courses') {
+      setCurrentTab('tasks');
+    }
+  }, [prefs.simplifiedMode, currentTab]);
+
+  const renderContent = () => {
+    switch (currentTab) {
+      case 'courses':
+        return <WebDashboard onSelectCourse={handleSelectCourse} />;
+      case 'tasks':
+        return (
+          <WebTasks
+            activeCourseFilter={selectedCourseId}
+            onClearFilter={() => setSelectedCourseId(null)}
+          />
+        );
+      case 'history':
+        return <WebHistory />;
+      case 'settings':
+        return <WebSettings />;
+      case 'profile':
+        return <ProfileScreen />;
+      default:
+        return <WebTasks activeCourseFilter={null} onClearFilter={() => { }} />;
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: theme.bg, fontFamily: 'sans-serif' }}>
+
+      {/* 🧭 BARRA LATERAL ACESSÍVEL (Único local de navegação e ajustes agora) */}
+      <nav style={{
+        width: prefs.spacing === 'wide' ? '320px' : '260px',
+        backgroundColor: theme.sidebarBg,
+        borderRight: `3px solid ${theme.borderColor}`,
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '24px 16px',
+        gap: prefs.spacing === 'wide' ? '20px' : '12px'
+      }}>
+        <div style={{ fontSize: '24px', fontWeight: 'bold', color: theme.text, marginBottom: '20px', textAlign: 'center' }}>
+          Plataforma Digital 🎓
+        </div>
+
+        {navItems.map((item) => (
+          <button
+            key={item.key}
+            onClick={() => {
+              if (item.key === 'courses') setSelectedCourseId(null);
+              setCurrentTab(item.key);
+            }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '14px', width: '100%', padding: '16px',
+              border: `2px solid ${currentTab === item.key ? theme.borderColor : 'transparent'}`,
+              borderRadius: '12px', cursor: 'pointer', textAlign: 'left', fontWeight: 'bold', fontSize: getFontSize(),
+              backgroundColor: currentTab === item.key ? theme.activeBg : 'transparent', color: theme.text
+            }}
+          >
+            <span style={{ fontSize: '28px' }}>{item.icon}</span> {item.label}
+          </button>
+        ))}
+      </nav>
+
+      {/* 💻 CONTEÚDO PRINCIPAL */}
+      <main style={{ flex: 1, padding: '40px', overflowY: 'auto' }}>
+        {renderContent()}
+      </main>
+    </div>
+  );
+}
+</file>
+
+<file path="apps/web/src/components/WebSettings.tsx">
+'use client';
+
+import React from 'react';
+import { useAccessibility } from '../context/AccessibilityContext';
+
+export default function WebSettings() {
+  const { prefs, updatePrefs } = useAccessibility();
+
+  const theme = {
+    card: prefs.highContrast ? '#121212' : '#ffffff',
+    borderColor: prefs.highContrast ? '#facc15' : '#e2e8f0',
+    text: prefs.highContrast ? '#facc15' : '#1e293b',
+    textMuted: prefs.highContrast ? '#eab308' : '#64748b',
+    buttonBg: prefs.highContrast ? '#222222' : '#f1f5f9',
+    buttonActiveBg: prefs.highContrast ? '#facc15' : '#1e40af',
+    buttonActiveText: prefs.highContrast ? '#000000' : '#ffffff',
+  };
+
+  const getFontSize = (type: 'title' | 'body') => {
+    const isLarge = prefs.fontSize === 'large';
+    const isExtra = prefs.fontSize === 'extra-large';
+    return type === 'title' ? (isExtra ? '32px' : isLarge ? '28px' : '24px') : (isExtra ? '20px' : isLarge ? '18px' : '15px');
+  };
+
+  const updatePreference = (key: keyof typeof prefs, value: any) => {
+    updatePrefs({ ...(prefs as any), [key]: value });
+  };
+
+  return (
+    <div style={{ maxWidth: '800px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+      <header style={{ borderBottom: `2px solid ${theme.borderColor}`, paddingBottom: '20px' }}>
+        <h1 style={{ fontSize: getFontSize('title'), color: theme.text, margin: 0 }}>Ajustes de Acessibilidade ⚙️</h1>
+        <p style={{ fontSize: getFontSize('body'), color: theme.textMuted, marginTop: '10px' }}>
+          Escolha as opções abaixo para deixar a leitura do aplicativo mais confortável para você.
+        </p>
+      </header>
+
+      {/* 🅰️ SEÇÃO: TAMANHO DA LETRA */}
+      <section style={{ backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <h2 style={{ fontSize: getFontSize('body'), fontWeight: 'bold', color: theme.text, margin: 0 }}>🅰️ Tamanho do Texto</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+          {(['normal', 'large', 'extra-large'] as const).map((size) => {
+            const isActive = prefs.fontSize === size;
+            const labels = { normal: 'Padrão', large: 'Grande', 'extra-large': 'Muito Grande' };
+            return (
+              <button
+                key={size}
+                onClick={() => updatePreference('fontSize', size)}
+                style={{
+                  padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
+                  fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
+                  backgroundColor: isActive ? theme.buttonActiveBg : theme.buttonBg,
+                  color: isActive ? theme.buttonActiveText : theme.text
+                }}
+              >
+                {labels[size]}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* ↕️ SEÇÃO: ESPAÇAMENTO */}
+      <section style={{ backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <h2 style={{ fontSize: getFontSize('body'), fontWeight: 'bold', color: theme.text, margin: 0 }}>↕️ Espaçamento das Telas</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+          {(['normal', 'wide'] as const).map((space) => {
+            const isActive = prefs.spacing === space;
+            return (
+              <button
+                key={space}
+                onClick={() => updatePreference('spacing', space)}
+                style={{
+                  padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
+                  fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
+                  backgroundColor: isActive ? theme.buttonActiveBg : theme.buttonBg,
+                  color: isActive ? theme.buttonActiveText : theme.text
+                }}
+              >
+                {space === 'normal' ? 'Espaço Normal' : 'Mais Espaço entre Itens'}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 🎨 SEÇÃO: ALTO CONTRASTE */}
+      <section style={{ backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <h2 style={{ fontSize: getFontSize('body'), fontWeight: 'bold', color: theme.text, margin: 0 }}>🎨 Cores da Tela</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+          <button
+            onClick={() => updatePreference('highContrast', false)}
+            style={{
+              padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
+              fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
+              backgroundColor: !prefs.highContrast ? theme.buttonActiveBg : theme.buttonBg,
+              color: !prefs.highContrast ? theme.buttonActiveText : theme.text
+            }}
+          >
+            ⚪ Cores Normais (Claro)
+          </button>
+          <button
+            onClick={() => updatePreference('highContrast', true)}
+            style={{
+              padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
+              fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
+              backgroundColor: prefs.highContrast ? theme.buttonActiveBg : theme.buttonBg,
+              color: prefs.highContrast ? theme.buttonActiveText : theme.text
+            }}
+          >
+            ⚫ Alto Contraste (Fundo Preto)
+          </button>
+        </div>
+      </section>
+
+      {/* 🧭 SEÇÃO: MODO DE NAVEGAÇÃO */}
+      <section style={{ backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <h2 style={{ fontSize: getFontSize('body'), fontWeight: 'bold', color: theme.text, margin: 0 }}>🧭 Modo de Navegação</h2>
+        <p style={{ fontSize: getFontSize('body'), color: theme.textMuted, margin: 0 }}>
+          O Modo Simplificado deixa o menu com menos opções e mostra só o essencial na tela.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+          <button
+            onClick={() => updatePreference('simplifiedMode', false)}
+            style={{
+              padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
+              fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
+              backgroundColor: !prefs.simplifiedMode ? theme.buttonActiveBg : theme.buttonBg,
+              color: !prefs.simplifiedMode ? theme.buttonActiveText : theme.text
+            }}
+          >
+            📋 Modo Padrão
+          </button>
+          <button
+            onClick={() => updatePreference('simplifiedMode', true)}
+            style={{
+              padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
+              fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
+              backgroundColor: prefs.simplifiedMode ? theme.buttonActiveBg : theme.buttonBg,
+              color: prefs.simplifiedMode ? theme.buttonActiveText : theme.text
+            }}
+          >
+            ✨ Modo Simplificado
+          </button>
+        </div>
+      </section>
+
+      {/* 🔒 SEÇÃO: CONFIRMAÇÃO ANTES DE AÇÕES IMPORTANTES */}
+      <section style={{ backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <h2 style={{ fontSize: getFontSize('body'), fontWeight: 'bold', color: theme.text, margin: 0 }}>🔒 Confirmação antes de Sair</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+          <button
+            onClick={() => updatePreference('extraConfirmation', false)}
+            style={{
+              padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
+              fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
+              backgroundColor: !prefs.extraConfirmation ? theme.buttonActiveBg : theme.buttonBg,
+              color: !prefs.extraConfirmation ? theme.buttonActiveText : theme.text
+            }}
+          >
+            Sair Direto, Sem Avisar
+          </button>
+          <button
+            onClick={() => updatePreference('extraConfirmation', true)}
+            style={{
+              padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
+              fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
+              backgroundColor: prefs.extraConfirmation ? theme.buttonActiveBg : theme.buttonBg,
+              color: prefs.extraConfirmation ? theme.buttonActiveText : theme.text
+            }}
+          >
+            🔒 Sempre Perguntar Antes
+          </button>
+        </div>
+      </section>
+
+      {/* 📅 SEÇÃO: LEMBRETES DE ESTUDO */}
+      <section style={{ backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <h2 style={{ fontSize: getFontSize('body'), fontWeight: 'bold', color: theme.text, margin: 0 }}>📅 Lembretes de Estudo</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+          {(['none', 'daily', 'weekly'] as const).map((freq) => {
+            const isActive = prefs.reminderFrequency === freq;
+            const labels = { none: 'Não Avisar', daily: 'Todo Dia 📅', weekly: 'Toda Semana 🗓️' };
+            return (
+              <button
+                key={freq}
+                onClick={() => updatePreference('reminderFrequency', freq)}
+                style={{
+                  padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
+                  fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
+                  backgroundColor: isActive ? theme.buttonActiveBg : theme.buttonBg,
+                  color: isActive ? theme.buttonActiveText : theme.text
+                }}
+              >
+                {labels[freq]}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* 🎉 SEÇÃO: FEEDBACK VISUAL REFORÇADO */}
+      <section style={{ backgroundColor: theme.card, border: `3px solid ${theme.borderColor}`, borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <h2 style={{ fontSize: getFontSize('body'), fontWeight: 'bold', color: theme.text, margin: 0 }}>🎉 Feedback Visual Reforçado</h2>
+        <p style={{ fontSize: getFontSize('body'), color: theme.textMuted, margin: 0 }}>
+          Quando ligado, o sistema mostra uma confirmação visual maior (com cor, ícone e animação) sempre que uma ação der certo, como concluir uma atividade.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
+          <button
+            onClick={() => updatePreference('enhancedFeedback', false)}
+            style={{
+              padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
+              fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
+              backgroundColor: !prefs.enhancedFeedback ? theme.buttonActiveBg : theme.buttonBg,
+              color: !prefs.enhancedFeedback ? theme.buttonActiveText : theme.text
+            }}
+          >
+            Feedback Simples
+          </button>
+          <button
+            onClick={() => updatePreference('enhancedFeedback', true)}
+            style={{
+              padding: '16px', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer',
+              fontSize: getFontSize('body'), border: `2px solid ${theme.borderColor}`,
+              backgroundColor: prefs.enhancedFeedback ? theme.buttonActiveBg : theme.buttonBg,
+              color: prefs.enhancedFeedback ? theme.buttonActiveText : theme.text
+            }}
+          >
+            🎉 Feedback Reforçado
+          </button>
+        </div>
+      </section>
+      {/* 🎬 REDUZIR ANIMAÇÕES */}
+      <section
+        style={{
+          backgroundColor: theme.card,
+          border: `3px solid ${theme.borderColor}`,
+          borderRadius: '16px',
+          padding: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+        }}
+      >
+        <h2
+          style={{
+            fontSize: getFontSize('body'),
+            fontWeight: 'bold',
+            color: theme.text,
+            margin: 0,
+          }}
+        >
+          🎬 Reduzir Animações
+        </h2>
+
+        <p
+          style={{
+            fontSize: getFontSize('body'),
+            color: theme.textMuted,
+            margin: 0,
+          }}
+        >
+          Remove transições e animações para deixar a navegação mais estável e
+          confortável.
+        </p>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: '12px',
+          }}
+        >
+          <button
+            onClick={() => updatePreference('reduceMotion', false)}
+            style={{
+              padding: '16px',
+              borderRadius: '12px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              fontSize: getFontSize('body'),
+              border: `2px solid ${theme.borderColor}`,
+              backgroundColor: !prefs.reduceMotion
+                ? theme.buttonActiveBg
+                : theme.buttonBg,
+              color: !prefs.reduceMotion
+                ? theme.buttonActiveText
+                : theme.text,
+            }}
+          >
+            Animações Normais
+          </button>
+
+          <button
+            onClick={() => updatePreference('reduceMotion', true)}
+            style={{
+              padding: '16px',
+              borderRadius: '12px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              fontSize: getFontSize('body'),
+              border: `2px solid ${theme.borderColor}`,
+              backgroundColor: prefs.reduceMotion
+                ? theme.buttonActiveBg
+                : theme.buttonBg,
+              color: prefs.reduceMotion
+                ? theme.buttonActiveText
+                : theme.text,
+            }}
+          >
+            🎬 Reduzir Animações
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+</file>
+
+<file path="packages/core-domain/src/accessibility/preferences.ts">
+export interface AccessibilityPreferences {
+  fontSize: 'normal' | 'large' | 'extra-large';
+  highContrast: boolean;
+  spacing: 'normal' | 'wide';
+
+  basicMode: boolean;
+  enhancedFeedback: boolean;
+  requireConfirmation: boolean;
+  reduceAnimations: boolean;
+
+  notificationsEnabled: boolean;
+  reminderTime: string;
+}
+</file>
+
 <file path="packages/core-domain/src/use-cases/UserDataInitializer.ts">
 import { doc, setDoc, collection, getDoc } from 'firebase/firestore';
 import { AccessibilityPreferences } from '../accessibility/preferences';
@@ -4280,6 +4745,264 @@ export const inicializarPerfilE_Tarefas = async (
     throw error;
   }
 };
+</file>
+
+<file path="apps/mobile/App.tsx">
+import React, { useState, useEffect } from 'react';
+import { StatusBar, StyleSheet, View, ActivityIndicator } from 'react-native';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from './src/lib/firebase';
+
+// 🌟 SUBSTITUÍMOS O IMPORT DO REACT-NATIVE POR ESTES DO SAFE-AREA-CONTEXT:
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+
+import { AccessibilityProvider } from './src/context/AccessibilityContext';
+import {LoginScreen} from './src/screens/LoginScreen';
+import MainTabNavigator from './src/navigation/MainTabNavigator'; 
+
+export default function App() {
+  const [user, setUser] = useState<any>(null);
+  const [initializing, setInitializing] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (initializing) setInitializing(false);
+    });
+    return unsubscribe;
+  }, [initializing]);
+
+  if (initializing) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc' }}>
+        <ActivityIndicator size="large" color="#1e40af" />
+      </View>
+    );
+  }
+
+  return (
+    // 🌟 EMBRULHAMOS COM O PROVIDER DA NOVA BIBLIOTECA:
+    <SafeAreaProvider>
+      <AccessibilityProvider>
+        <SafeAreaView style={styles.container}>
+          <StatusBar barStyle="dark-content" />
+          
+          {user ? <MainTabNavigator /> : <LoginScreen />}
+
+        </SafeAreaView>
+      </AccessibilityProvider>
+    </SafeAreaProvider>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});
+</file>
+
+<file path="apps/web/app/dashboard/layout.tsx">
+'use client';
+
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { auth } from '../../src/lib/firebase';
+import { signOut } from 'firebase/auth';
+import { AccessibilityProvider, useAccessibility } from '../../src/context/AccessibilityContext';
+import ConfirmDialog from '../../src/components/ConfirmDialog';
+
+// Removido o AccessibilityPanel que não será mais usado aqui
+
+function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const { prefs, loading } = useAccessibility(); // Removido o updatePrefs daqui, já que os ajustes saíram do header
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  const handleLogout = () => {
+    if (prefs.extraConfirmation) {
+      setShowLogoutConfirm(true);
+      return;
+    }
+    performLogout();
+  };
+
+  const performLogout = async () => {
+    await signOut(auth);
+    router.push('/');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <h2 className="text-3xl font-bold text-slate-700 animate-pulse">Carregando seu painel...</h2>
+      </div>
+    );
+  }
+
+  const getFontSizeClass = () => {
+    if (prefs.fontSize === 'large') return 'text-xl';
+    if (prefs.fontSize === 'extra-large') return 'text-2xl';
+    return 'text-base';
+  };
+
+  const theme = {
+    bg: prefs.highContrast ? 'bg-black text-yellow-400' : 'bg-slate-50 text-slate-800',
+    headerBg: prefs.highContrast ? 'bg-zinc-950 border-b-4 border-yellow-400' : 'bg-white border-b-2 border-slate-200 shadow-sm',
+    logoutText: prefs.highContrast ? 'text-yellow-400 underline' : 'text-slate-500 hover:text-red-600 font-semibold'
+  };
+
+  return (
+    <div className={`min-h-screen flex flex-col transition-colors duration-200 ${theme.bg}`}>
+      {/* 🧭 HEADER DA ÁREA LOGADA SIMPLIFICADO */}
+      <nav className={`p-5 sticky top-0 z-50 transition-colors duration-200 ${theme.headerBg}`}>
+        <div className="max-w-7xl mx-auto flex flex-row items-center justify-between gap-4">
+          <span className={`font-black tracking-tight ${prefs.fontSize === 'normal' ? 'text-2xl' : 'text-3xl'}`}>
+            SeniorEase 🌟
+          </span>
+          <div className="flex items-center gap-6">
+            {/* O BOTÃO "AJUSTAR TELA" FOI REMOVIDO DAQUI */}
+            <button 
+              onClick={handleLogout} 
+              className={`transition-all bg-transparent border-0 cursor-pointer ${theme.logoutText} ${getFontSizeClass()}`}
+            >
+              Sair
+            </button>
+          </div>
+        </div>
+      </nav>
+
+
+      <main className="flex-1 max-w-7xl w-full mx-auto p-6">
+        {children}
+      </main>
+
+      <ConfirmDialog
+        visible={showLogoutConfirm}
+        title="Aviso importante 🤔"
+        message="Você quer mesmo sair do aplicativo agora?"
+        confirmLabel="Sim, quero sair"
+        cancelLabel="Não, quero continuar"
+        destructive
+        onConfirm={() => {
+          setShowLogoutConfirm(false);
+          performLogout();
+        }}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
+    </div>
+  );
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AccessibilityProvider>
+      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+    </AccessibilityProvider>
+  );
+}
+</file>
+
+<file path="apps/web/app/dashboard/page.tsx">
+'use client';
+
+import MainLayout from '../../src/components/MainLayout';
+
+export default function DashboardPage() {
+  return <MainLayout />;
+}
+</file>
+
+<file path="apps/web/app/page.tsx">
+'use client';
+
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { AccessibilityPanel, AccessibilityPreferences } from '../src/components/AccessibilityPanel';
+
+export default function WelcomePage() {
+  const router = useRouter();
+  const [showPreferences, setShowPreferences] = useState(false);
+
+  const [prefs, setPrefs] = useState<AccessibilityPreferences>({
+    fontSize: 'normal',
+    highContrast: false,
+    spacing: 'normal',
+    simplifiedMode: false,
+    extraConfirmation: false,
+    reminderFrequency: 'none'
+  });
+
+  const getFontSizeClass = () => {
+    if (prefs.fontSize === 'large') return 'text-2xl';
+    if (prefs.fontSize === 'extra-large') return 'text-3xl';
+    return 'text-xl';
+  };
+
+  const getPageBackground = () => prefs.highContrast ? 'bg-black text-yellow-400' : 'bg-slate-50 text-slate-800';
+  const getCardBackground = () => prefs.highContrast ? 'bg-zinc-900 border-yellow-400' : 'bg-white border-slate-200';
+
+  return (
+    <main className={`min-h-screen flex flex-col items-center justify-center p-6 ${getPageBackground()}`}>
+      <div className={`w-full max-w-3xl rounded-2xl shadow-xl p-10 border-2 text-center ${getCardBackground()} ${prefs.spacing === 'wide' ? 'space-y-10' : 'space-y-6'}`}>
+        
+        <h1 className={`font-bold ${prefs.fontSize === 'normal' ? 'text-4xl' : 'text-5xl'}`}>
+          Olá! Bem-vindo ao SeniorEase 🌟
+        </h1>
+        
+        <p className={`${getFontSizeClass()} leading-relaxed opacity-90`}>
+          Preparamos um espaço simples para você aprender e realizar suas atividades acadêmicas.
+        </p>
+
+        {!showPreferences ? (
+          <div className={`flex flex-col ${prefs.spacing === 'wide' ? 'gap-6' : 'gap-4'}`}>
+            <button
+              onClick={() => router.push(`/auth?mode=login`)}
+              className={`w-full py-6 rounded-2xl font-bold shadow-md ${
+                prefs.highContrast ? 'bg-yellow-400 text-black' : 'bg-emerald-600 text-white'
+              } ${prefs.fontSize === 'normal' ? 'text-2xl' : 'text-3xl'}`}
+            >
+              👋 Já tenho conta (Entrar)
+            </button>
+
+            <button
+              onClick={() => router.push(`/auth?mode=register`)}
+              className={`w-full py-6 rounded-2xl font-bold shadow-md border-2 ${
+                prefs.highContrast ? 'border-yellow-400 text-yellow-400' : 'bg-white text-slate-800 border-slate-300'
+              } ${prefs.fontSize === 'normal' ? 'text-2xl' : 'text-3xl'}`}
+            >
+              📝 Quero me cadastrar
+            </button>
+
+            <button
+              onClick={() => setShowPreferences(true)}
+              className={`w-full py-4 text-center underline font-bold ${prefs.highContrast ? 'text-yellow-400' : 'text-blue-600'} ${getFontSizeClass()}`}
+            >
+              ⚙️ Ajustar as Letras, Cores e Espaçamento
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-6">
+            <AccessibilityPanel prefs={prefs} onChange={setPrefs} />
+            <button
+              onClick={() => {
+                localStorage.setItem('pre_prefs', JSON.stringify(prefs));
+                setShowPreferences(false);
+              }}
+              className={`w-full max-w-2xl py-5 rounded-xl font-bold ${
+                prefs.highContrast ? 'bg-white text-black' : 'bg-slate-800 text-white'
+              } ${prefs.fontSize === 'normal' ? 'text-xl' : 'text-2xl'}`}
+            >
+              ✔️ Pronto, Salvar e Voltar
+            </button>
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
 </file>
 
 <file path="packages/core-domain/package.json">
@@ -4512,58 +5235,131 @@ const styles = StyleSheet.create({
 });
 </file>
 
-<file path="apps/mobile/App.tsx">
+<file path="apps/mobile/src/screens/DashboardScreen.tsx">
 import React, { useState, useEffect } from 'react';
-import { StatusBar, StyleSheet, View, ActivityIndicator } from 'react-native';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './src/lib/firebase';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { db, auth } from '../lib/firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { useAccessibility } from '../context/AccessibilityContext';
+import { CalculateProgress } from '@seniorease/domain';
+import { Header } from '../components/Header'; 
 
-// 🌟 SUBSTITUÍMOS O IMPORT DO REACT-NATIVE POR ESTES DO SAFE-AREA-CONTEXT:
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+export default function DashboardScreen() {
+  const { prefs } = useAccessibility();
+  const [progress, setProgress] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const userId = auth.currentUser?.uid;
 
-import { AccessibilityProvider } from './src/context/AccessibilityContext';
-import {LoginScreen} from './src/screens/LoginScreen';
-import MainTabNavigator from './src/navigation/MainTabNavigator'; 
+  const getFontSize = (type: 'title' | 'body' | 'percentage') => {
+    const modifier = prefs.fontSize === 'extra-large' ? 6 : prefs.fontSize === 'large' ? 3 : 0;
+    if (type === 'percentage') return 36 + modifier;
+    if (type === 'title') return 22 + modifier;
+    return 18 + modifier;
+  };
 
-export default function App() {
-  const [user, setUser] = useState<any>(null);
-  const [initializing, setInitializing] = useState(true);
+  const theme = {
+    bg: prefs.highContrast ? '#000000' : '#f8fafc',
+    card: prefs.highContrast ? '#121212' : '#ffffff',
+    text: prefs.highContrast ? '#ffff00' : '#1e293b',
+    textMuted: prefs.highContrast ? '#ffffff' : '#64748b',
+    border: prefs.highContrast ? '#ffff00' : '#cbd5e1',
+    progressBg: prefs.highContrast ? '#1c1c1c' : '#e2e8f0',
+    progressFill: prefs.highContrast ? '#ffff00' : '#16a34a',
+  };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (initializing) setInitializing(false);
-    });
-    return unsubscribe;
-  }, [initializing]);
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
 
-  if (initializing) {
+    const tasksRef = collection(db, 'users', userId, 'tasks');
+    
+    const unsubscribe = onSnapshot(tasksRef, (snapshot) => {
+      const tasksList: { completed: boolean }[] = [];
+      snapshot.forEach((doc) => {
+        tasksList.push({ completed: doc.data().completed || false });
+      });
+
+      const computedProgress = CalculateProgress.execute(tasksList);
+      setProgress(computedProgress);
+      setLoading(false);
+    }, (error) => {
+      console.error("Erro ao computar progresso no dashboard:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [userId]);
+
+  if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc' }}>
-        <ActivityIndicator size="large" color="#1e40af" />
+      <View style={[styles.center, { backgroundColor: theme.bg }]}>
+        <ActivityIndicator size="large" color={prefs.highContrast ? '#ffff00' : '#2563eb'} />
       </View>
     );
   }
 
   return (
-    // 🌟 EMBRULHAMOS COM O PROVIDER DA NOVA BIBLIOTECA:
-    <SafeAreaProvider>
-      <AccessibilityProvider>
-        <SafeAreaView style={styles.container}>
-          <StatusBar barStyle="dark-content" />
-          
-          {user ? <MainTabNavigator /> : <LoginScreen />}
+    <View style={{ flex: 1, backgroundColor: theme.bg }}>
+      {/* 🌟 O Header isolado e reutilizável aplicado lindamente aqui */}
+      <Header title="Minhas Atividades 🌟" />
 
-        </SafeAreaView>
-      </AccessibilityProvider>
-    </SafeAreaProvider>
+      <ScrollView contentContainerStyle={[styles.container, { padding: prefs.spacing === 'wide' ? 24 : 16 }]}>
+        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, gap: prefs.spacing === 'wide' ? 20 : 12 }]}>
+          
+          <Text style={[styles.title, { color: theme.text, fontSize: getFontSize('title') }]}>
+            Seu Progresso de Hoje 🚀
+          </Text>
+          
+          <Text style={[styles.percentageText, { color: prefs.highContrast ? '#ffff00' : '#2563eb', fontSize: getFontSize('percentage') }]}>
+            {progress}% Concluído
+          </Text>
+          
+          <View style={[styles.progressBarBackground, { backgroundColor: theme.progressBg }]}>
+            <View style={[styles.progressBarFill, { width: `${progress}%`, backgroundColor: theme.progressFill }]} />
+          </View>
+
+          <Text style={[styles.motivationalText, { color: theme.textMuted, fontSize: getFontSize('body'), lineHeight: prefs.spacing === 'wide' ? 30 : 24 }]}>
+            {progress === 100 
+              ? "Parabéns! Você completou todas as atividades de hoje! 🎉" 
+              : "Continue assim! Cada pequeno passo conta na nossa jornada digital. 🧑‍💻"}
+          </Text>
+
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  container: { flexGrow: 1, justifyContent: 'center' },
+  card: {
+    padding: 24,
+    borderRadius: 24,
+    borderWidth: 3,
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
+  title: { fontWeight: 'bold', textAlign: 'center' },
+  percentageText: { fontWeight: '900', marginVertical: 4 },
+  progressBarBackground: {
+    width: '100%',
+    height: 28,
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginVertical: 10,
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 14,
+  },
+  motivationalText: { textAlign: 'center', fontWeight: '500' }
 });
 </file>
 
@@ -4599,209 +5395,6 @@ const styles = StyleSheet.create({
     "test": "jest"
   },
   "private": true
-}
-</file>
-
-<file path="apps/web/app/dashboard/layout.tsx">
-'use client';
-
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { auth } from '../../src/lib/firebase';
-import { signOut } from 'firebase/auth';
-import { AccessibilityProvider, useAccessibility } from '../../src/context/AccessibilityContext';
-import ConfirmDialog from '../../src/components/ConfirmDialog';
-
-// Removido o AccessibilityPanel que não será mais usado aqui
-
-function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const { prefs, loading } = useAccessibility(); // Removido o updatePrefs daqui, já que os ajustes saíram do header
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-
-  const handleLogout = () => {
-    if (prefs.extraConfirmation) {
-      setShowLogoutConfirm(true);
-      return;
-    }
-    performLogout();
-  };
-
-  const performLogout = async () => {
-    await signOut(auth);
-    router.push('/');
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <h2 className="text-3xl font-bold text-slate-700 animate-pulse">Carregando seu painel...</h2>
-      </div>
-    );
-  }
-
-  const getFontSizeClass = () => {
-    if (prefs.fontSize === 'large') return 'text-xl';
-    if (prefs.fontSize === 'extra-large') return 'text-2xl';
-    return 'text-base';
-  };
-
-  const theme = {
-    bg: prefs.highContrast ? 'bg-black text-yellow-400' : 'bg-slate-50 text-slate-800',
-    headerBg: prefs.highContrast ? 'bg-zinc-950 border-b-4 border-yellow-400' : 'bg-white border-b-2 border-slate-200 shadow-sm',
-    logoutText: prefs.highContrast ? 'text-yellow-400 underline' : 'text-slate-500 hover:text-red-600 font-semibold'
-  };
-
-  return (
-    <div className={`min-h-screen flex flex-col transition-colors duration-200 ${theme.bg}`}>
-      {/* 🧭 HEADER DA ÁREA LOGADA SIMPLIFICADO */}
-      <nav className={`p-5 sticky top-0 z-50 transition-colors duration-200 ${theme.headerBg}`}>
-        <div className="max-w-7xl mx-auto flex flex-row items-center justify-between gap-4">
-          <span className={`font-black tracking-tight ${prefs.fontSize === 'normal' ? 'text-2xl' : 'text-3xl'}`}>
-            SeniorEase 🌟
-          </span>
-          <div className="flex items-center gap-6">
-            {/* O BOTÃO "AJUSTAR TELA" FOI REMOVIDO DAQUI */}
-            <button 
-              onClick={handleLogout} 
-              className={`transition-all bg-transparent border-0 cursor-pointer ${theme.logoutText} ${getFontSizeClass()}`}
-            >
-              Sair
-            </button>
-          </div>
-        </div>
-      </nav>
-
-
-      <main className="flex-1 max-w-7xl w-full mx-auto p-6">
-        {children}
-      </main>
-
-      <ConfirmDialog
-        visible={showLogoutConfirm}
-        title="Aviso importante 🤔"
-        message="Você quer mesmo sair do aplicativo agora?"
-        confirmLabel="Sim, quero sair"
-        cancelLabel="Não, quero continuar"
-        destructive
-        onConfirm={() => {
-          setShowLogoutConfirm(false);
-          performLogout();
-        }}
-        onCancel={() => setShowLogoutConfirm(false)}
-      />
-    </div>
-  );
-}
-
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <AccessibilityProvider>
-      <DashboardLayoutContent>{children}</DashboardLayoutContent>
-    </AccessibilityProvider>
-  );
-}
-</file>
-
-<file path="apps/web/app/dashboard/page.tsx">
-'use client';
-
-import MainLayout from '../../src/components/MainLayout';
-
-export default function DashboardPage() {
-  return <MainLayout />;
-}
-</file>
-
-<file path="apps/web/app/page.tsx">
-'use client';
-
-'use client';
-
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { AccessibilityPanel, AccessibilityPreferences } from '../src/components/AccessibilityPanel';
-
-export default function WelcomePage() {
-  const router = useRouter();
-  const [showPreferences, setShowPreferences] = useState(false);
-
-  const [prefs, setPrefs] = useState<AccessibilityPreferences>({
-    fontSize: 'normal',
-    highContrast: false,
-    spacing: 'normal',
-    simplifiedMode: false,
-    extraConfirmation: false,
-    reminderFrequency: 'none'
-  });
-
-  const getFontSizeClass = () => {
-    if (prefs.fontSize === 'large') return 'text-2xl';
-    if (prefs.fontSize === 'extra-large') return 'text-3xl';
-    return 'text-xl';
-  };
-
-  const getPageBackground = () => prefs.highContrast ? 'bg-black text-yellow-400' : 'bg-slate-50 text-slate-800';
-  const getCardBackground = () => prefs.highContrast ? 'bg-zinc-900 border-yellow-400' : 'bg-white border-slate-200';
-
-  return (
-    <main className={`min-h-screen flex flex-col items-center justify-center p-6 ${getPageBackground()}`}>
-      <div className={`w-full max-w-3xl rounded-2xl shadow-xl p-10 border-2 text-center ${getCardBackground()} ${prefs.spacing === 'wide' ? 'space-y-10' : 'space-y-6'}`}>
-        
-        <h1 className={`font-bold ${prefs.fontSize === 'normal' ? 'text-4xl' : 'text-5xl'}`}>
-          Olá! Bem-vindo ao SeniorEase 🌟
-        </h1>
-        
-        <p className={`${getFontSizeClass()} leading-relaxed opacity-90`}>
-          Preparamos um espaço simples para você aprender e realizar suas atividades acadêmicas.
-        </p>
-
-        {!showPreferences ? (
-          <div className={`flex flex-col ${prefs.spacing === 'wide' ? 'gap-6' : 'gap-4'}`}>
-            <button
-              onClick={() => router.push(`/auth?mode=login`)}
-              className={`w-full py-6 rounded-2xl font-bold shadow-md ${
-                prefs.highContrast ? 'bg-yellow-400 text-black' : 'bg-emerald-600 text-white'
-              } ${prefs.fontSize === 'normal' ? 'text-2xl' : 'text-3xl'}`}
-            >
-              👋 Já tenho conta (Entrar)
-            </button>
-
-            <button
-              onClick={() => router.push(`/auth?mode=register`)}
-              className={`w-full py-6 rounded-2xl font-bold shadow-md border-2 ${
-                prefs.highContrast ? 'border-yellow-400 text-yellow-400' : 'bg-white text-slate-800 border-slate-300'
-              } ${prefs.fontSize === 'normal' ? 'text-2xl' : 'text-3xl'}`}
-            >
-              📝 Quero me cadastrar
-            </button>
-
-            <button
-              onClick={() => setShowPreferences(true)}
-              className={`w-full py-4 text-center underline font-bold ${prefs.highContrast ? 'text-yellow-400' : 'text-blue-600'} ${getFontSizeClass()}`}
-            >
-              ⚙️ Ajustar as Letras, Cores e Espaçamento
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-6">
-            <AccessibilityPanel prefs={prefs} onChange={setPrefs} />
-            <button
-              onClick={() => {
-                localStorage.setItem('pre_prefs', JSON.stringify(prefs));
-                setShowPreferences(false);
-              }}
-              className={`w-full max-w-2xl py-5 rounded-xl font-bold ${
-                prefs.highContrast ? 'bg-white text-black' : 'bg-slate-800 text-white'
-              } ${prefs.fontSize === 'normal' ? 'text-xl' : 'text-2xl'}`}
-            >
-              ✔️ Pronto, Salvar e Voltar
-            </button>
-          </div>
-        )}
-      </div>
-    </main>
-  );
 }
 </file>
 
@@ -5240,134 +5833,6 @@ export const useAccessibility = () => {
   }
   return context;
 };
-</file>
-
-<file path="apps/mobile/src/screens/DashboardScreen.tsx">
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
-import { db, auth } from '../lib/firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { useAccessibility } from '../context/AccessibilityContext';
-import { CalculateProgress } from '@seniorease/domain';
-import { Header } from '../components/Header'; 
-
-export default function DashboardScreen() {
-  const { prefs } = useAccessibility();
-  const [progress, setProgress] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const userId = auth.currentUser?.uid;
-
-  const getFontSize = (type: 'title' | 'body' | 'percentage') => {
-    const modifier = prefs.fontSize === 'extra-large' ? 6 : prefs.fontSize === 'large' ? 3 : 0;
-    if (type === 'percentage') return 36 + modifier;
-    if (type === 'title') return 22 + modifier;
-    return 18 + modifier;
-  };
-
-  const theme = {
-    bg: prefs.highContrast ? '#000000' : '#f8fafc',
-    card: prefs.highContrast ? '#121212' : '#ffffff',
-    text: prefs.highContrast ? '#ffff00' : '#1e293b',
-    textMuted: prefs.highContrast ? '#ffffff' : '#64748b',
-    border: prefs.highContrast ? '#ffff00' : '#cbd5e1',
-    progressBg: prefs.highContrast ? '#1c1c1c' : '#e2e8f0',
-    progressFill: prefs.highContrast ? '#ffff00' : '#16a34a',
-  };
-
-  useEffect(() => {
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
-
-    const tasksRef = collection(db, 'users', userId, 'tasks');
-    
-    const unsubscribe = onSnapshot(tasksRef, (snapshot) => {
-      const tasksList: { completed: boolean }[] = [];
-      snapshot.forEach((doc) => {
-        tasksList.push({ completed: doc.data().completed || false });
-      });
-
-      const computedProgress = CalculateProgress.execute(tasksList);
-      setProgress(computedProgress);
-      setLoading(false);
-    }, (error) => {
-      console.error("Erro ao computar progresso no dashboard:", error);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [userId]);
-
-  if (loading) {
-    return (
-      <View style={[styles.center, { backgroundColor: theme.bg }]}>
-        <ActivityIndicator size="large" color={prefs.highContrast ? '#ffff00' : '#2563eb'} />
-      </View>
-    );
-  }
-
-  return (
-    <View style={{ flex: 1, backgroundColor: theme.bg }}>
-      {/* 🌟 O Header isolado e reutilizável aplicado lindamente aqui */}
-      <Header title="Minhas Atividades 🌟" />
-
-      <ScrollView contentContainerStyle={[styles.container, { padding: prefs.spacing === 'wide' ? 24 : 16 }]}>
-        <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, gap: prefs.spacing === 'wide' ? 20 : 12 }]}>
-          
-          <Text style={[styles.title, { color: theme.text, fontSize: getFontSize('title') }]}>
-            Seu Progresso de Hoje 🚀
-          </Text>
-          
-          <Text style={[styles.percentageText, { color: prefs.highContrast ? '#ffff00' : '#2563eb', fontSize: getFontSize('percentage') }]}>
-            {progress}% Concluído
-          </Text>
-          
-          <View style={[styles.progressBarBackground, { backgroundColor: theme.progressBg }]}>
-            <View style={[styles.progressBarFill, { width: `${progress}%`, backgroundColor: theme.progressFill }]} />
-          </View>
-
-          <Text style={[styles.motivationalText, { color: theme.textMuted, fontSize: getFontSize('body'), lineHeight: prefs.spacing === 'wide' ? 30 : 24 }]}>
-            {progress === 100 
-              ? "Parabéns! Você completou todas as atividades de hoje! 🎉" 
-              : "Continue assim! Cada pequeno passo conta na nossa jornada digital. 🧑‍💻"}
-          </Text>
-
-        </View>
-      </ScrollView>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  container: { flexGrow: 1, justifyContent: 'center' },
-  card: {
-    padding: 24,
-    borderRadius: 24,
-    borderWidth: 3,
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  title: { fontWeight: 'bold', textAlign: 'center' },
-  percentageText: { fontWeight: '900', marginVertical: 4 },
-  progressBarBackground: {
-    width: '100%',
-    height: 28,
-    borderRadius: 14,
-    overflow: 'hidden',
-    marginVertical: 10,
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 14,
-  },
-  motivationalText: { textAlign: 'center', fontWeight: '500' }
-});
 </file>
 
 <file path="apps/mobile/src/screens/LoginScreen.tsx">

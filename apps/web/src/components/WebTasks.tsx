@@ -30,6 +30,7 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
   const [pendingToggleCompletedSection, setPendingToggleCompletedSection] = useState(false);
 
   const [showCompleted, setShowCompleted] = useState(!prefs.simplifiedMode);
+
   useEffect(() => {
     setShowCompleted(!prefs.simplifiedMode);
   }, [prefs.simplifiedMode]);
@@ -113,16 +114,24 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
 
   const toggleTask = (taskId: string, isCompleted: boolean) => {
     const task = tasks.find((t) => t.id === taskId) || null;
-    if (isCompleted) {
-      setTaskPendingUndo(task);
+    if (prefs.extraConfirmation) {
+      if (isCompleted) {
+        setTaskPendingUndo(task);
+      } else {
+        setTaskPendingComplete(task);
+      }
     } else {
-      setTaskPendingComplete(task);
+      if (task) performToggle(task.id, task.completed);
     }
   };
 
   const requestOpenGuidedFlow = (task: Task) => {
     if (task.completed) return;
-    setTaskToStartGuided(task);
+    if (prefs.extraConfirmation) {
+      setTaskToStartGuided(task);
+    } else {
+      startGuidedFlow(task);
+    }
   };
 
   const startGuidedFlow = (task: Task) => {
@@ -156,7 +165,13 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
             Mostrando tarefas de: <strong>{currentCourseName}</strong>
           </span>
           <button
-            onClick={() => setShowConfirmClearFilter(true)}
+            onClick={() => {
+              if (prefs.extraConfirmation) {
+                setShowConfirmClearFilter(true);
+              } else {
+                onClearFilter();
+              }
+            }}
             style={{ padding: '12px 24px', cursor: 'pointer', borderRadius: '10px', fontWeight: 'bold', border: `3px solid ${theme.borderColor}`, backgroundColor: theme.buttonClearBg, color: theme.buttonClearText, fontSize: getFontSize('body'), transition: transitionStyle }}
           >
             Mostrar Todas as Tarefas
@@ -179,7 +194,7 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
                 {!prefs.simplifiedMode && !activeCourseFilter && task.courseName && (
                   <span style={{ color: theme.textMuted, fontSize: '13px', fontWeight: 'bold' }}>{task.courseName}</span>
                 )}
-                <span style={{ color: theme.textMuted, fontSize: '13px' }}>Clique para ver o passo a passo</span>
+                <span style={{ color: theme.textMuted, fontSize: '13px', display: 'block', marginTop: '4px' }}>Clique para ver o passo a passo</span>
               </div>
               <button onClick={() => toggleTask(task.id, task.completed)} style={{ padding: '12px 20px', cursor: 'pointer', borderRadius: '8px', border: `2px solid ${theme.borderColor}`, backgroundColor: theme.buttonClearBg, color: theme.text, fontSize: getFontSize('body'), transition: transitionStyle }}>
                 Marcar como Feita
@@ -191,13 +206,18 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
 
       {!prefs.simplifiedMode && (
         <button
-          onClick={() =>
-            setPendingToggleCompletedSection(true)
-          }
+          onClick={() => {
+            if (prefs.extraConfirmation) {
+              setPendingToggleCompletedSection(true);
+            } else {
+              setShowCompleted((prev) => !prev);
+            }
+          }}
           style={{ alignSelf: 'flex-start', padding: '10px 18px', borderRadius: '10px', border: `2px solid ${theme.borderColor}`, backgroundColor: theme.buttonClearBg, color: theme.text, fontWeight: 'bold', cursor: 'pointer', fontSize: getFontSize('body'), transition: transitionStyle }}
         >
           {showCompleted ? 'Ocultar Concluídas' : 'Mostrar Concluídas'} ({finishedTasks.length})
-        </button>)}
+        </button>
+      )}
 
       {showCompleted &&
         !prefs.simplifiedMode && (
@@ -233,9 +253,7 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
               </button>
             ) : (
               <button
-                onClick={() =>
-                  setGuidedStepIndex((i) => i + 1)
-                }
+                onClick={() => setGuidedStepIndex((i) => i + 1)}
                 style={{ padding: '16px', cursor: 'pointer', borderRadius: '12px', border: 'none', backgroundColor: theme.buttonActiveBg, color: '#ffffff', fontWeight: 'bold', fontSize: getFontSize('body'), transition: transitionStyle }}>
                 Avançar Passo
               </button>
@@ -243,9 +261,8 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
 
             {guidedStepIndex > 0 && (
               <button
-                onClick={() =>
-                  setGuidedStepIndex((i) => i - 1)
-                } style={{ padding: '12px', cursor: 'pointer', borderRadius: '12px', border: `2px solid ${theme.borderColor}`, backgroundColor: 'transparent', color: theme.text, fontWeight: 'bold', fontSize: getFontSize('body'), transition: transitionStyle }}>
+                onClick={() => setGuidedStepIndex((i) => i - 1)}
+                style={{ padding: '12px', cursor: 'pointer', borderRadius: '12px', border: `2px solid ${theme.borderColor}`, backgroundColor: 'transparent', color: theme.text, fontWeight: 'bold', fontSize: getFontSize('body'), transition: transitionStyle }}>
                 Passo Anterior
               </button>
             )}
@@ -330,6 +347,7 @@ export default function WebTasks({ activeCourseFilter, onClearFilter }: WebTasks
         }}
         onCancel={() => setShowConfirmClearFilter(false)}
       />
+
       <ConfirmDialog
         visible={pendingToggleCompletedSection}
         title={showCompleted ? "Ocultar Tarefas Concluídas?" : "Mostrar Tarefas Concluídas?"}
